@@ -6,19 +6,20 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import rpg.api.CombatApi;
-import rpg.core.config.ConfigManager;
 import rpg.core.message.MessageManager;
-import rpg.core.player.PlayerDataManager;
 import rpg.core.scheduler.SchedulerService;
 import rpg.dungeon.manager.DungeonInstanceManager;
+import rpg.dungeon.model.DungeonArena;
 import rpg.dungeon.model.DungeonData;
 import rpg.dungeon.model.DungeonEndReason;
 import rpg.dungeon.model.DungeonInstance;
-import rpg.dungeon.model.PlayerDungeonComponent;
+import rpg.dungeon.repository.PlayerDungeonRepository;
+import rpg.extra.api.PartyApi;
 import rpg.quest.service.QuestProgressService;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
@@ -34,48 +35,51 @@ import java.util.UUID;
 public final class DungeonEncounterService {
 
     public enum ChallengeFailure {
-        NOT_UNLOCKED, UNKNOWN_DUNGEON, PARTY_TOO_SMALL, PARTY_TOO_LARGE, WORLD_NOT_FOUND, ALREADY_IN_DUNGEON
+        NOT_UNLOCKED, UNKNOWN_DUNGEON, PARTY_TOO_SMALL, PARTY_TOO_LARGE, WORLD_NOT_FOUND, ALREADY_IN_DUNGEON, DUNGEON_FULL
     }
 
-    private static final double DEFAULT_PARTY_GATHER_RADIUS = 15.0;
     private static final double SPAWN_JITTER_RADIUS = 2.5;
 
     private final DungeonService dungeonService;
     private final DungeonInstanceManager instanceManager;
     private final CombatApi combatApi;
     private final SchedulerService schedulerService;
-    private final ConfigManager configManager;
-    private final PlayerDataManager playerDataManager;
+    private final PlayerDungeonRepository playerDungeonRepository;
+    private final PartyApi partyApi;
     private final QuestProgressService questProgressService;
     private final MessageManager messages;
     private final Random random = new Random();
 
+    /** The party a challenge is resolved against: who must have the dungeon unlocked, and who actually enters. */
+    private record PartyResolution(UUID leaderId, List<Player> members) {
+    }
+
     public DungeonEncounterService(DungeonService dungeonService, DungeonInstanceManager instanceManager,
-                                    CombatApi combatApi, SchedulerService schedulerService, ConfigManager configManager,
-                                    PlayerDataManager playerDataManager, QuestProgressService questProgressService,
-                                    MessageManager messages) {
+                                    CombatApi combatApi, SchedulerService schedulerService,
+                                    PlayerDungeonRepository playerDungeonRepository, PartyApi partyApi,
+                                    QuestProgressService questProgressService, MessageManager messages) {
         this.dungeonService = dungeonService;
         this.instanceManager = instanceManager;
         this.combatApi = combatApi;
         this.schedulerService = schedulerService;
-        this.configManager = configManager;
-        this.playerDataManager = playerDataManager;
+        this.playerDungeonRepository = playerDungeonRepository;
+        this.partyApi = partyApi;
         this.questProgressService = questProgressService;
         this.messages = messages;
     }
 
-    /** Attempts to start a dungeon run for {@code initiator} (and any nearby players gathered as their party). */
+    /**
+     * Attempts to start a dungeon run for {@code initiator}'s real party (see
+     * {@link #resolveParty}) - a solo player if they aren't in one. Only the party leader
+     * needs to have unlocked the dungeon; other online members ride along.
+     */
     public Optional<ChallengeFailure> challenge(Player initiator, String dungeonId) {
-        PlayerDungeonComponent component = playerDataManager.get(initiator.getUniqueId())
-                .flatMap(d -> d.component(PlayerDungeonComponent.class)).orElse(null);
-        if (component == null || !component.isUnlocked(dungeonId)) {
+        PartyResolution resolution = resolveParty(initiator);
+        if (!playerDungeonRepository.isUnlocked(resolution.leaderId(), dungeonId)) {
             return Optional.of(ChallengeFailure.NOT_UNLOCKED);
         }
 
-        double radius = configManager.get("config.yml").get().getDouble("dungeon.party-gather-radius", DEFAULT_PARTY_GATHER_RADIUS);
-        List<Player> party = gatherNearbyParty(initiator, radius);
-
-        Optional<DungeonService.StartFailure> failure = dungeonService.start(dungeonId, party);
+        Optional<DungeonService.StartFailure> failure = dungeonService.start(dungeonId, resolution.members());
         if (failure.isPresent()) {
             return Optional.of(mapFailure(failure.get()));
         }
@@ -127,13 +131,35 @@ public final class DungeonEncounterService {
         });
     }
 
+    /**
+     * Resolves who a challenge is judged against: the real party from orelia-extra's
+     * {@link PartyApi} (leader's unlock status gates entry, every online member rides along),
+     * falling back to a solo party of just {@code initiator} when orelia-extra isn't installed
+     * or {@code initiator} isn't in a party.
+     */
+    private PartyResolution resolveParty(Player initiator) {
+        if (partyApi != null) {
+            Set<UUID> memberIds = partyApi.getMemberIds(initiator.getUniqueId());
+            if (!memberIds.isEmpty()) {
+                UUID leaderId = partyApi.getLeaderId(initiator.getUniqueId()).orElse(initiator.getUniqueId());
+                List<Player> onlineMembers = memberIds.stream()
+                        .map(Bukkit::getPlayer)
+                        .filter(Objects::nonNull)
+                        .toList();
+                return new PartyResolution(leaderId, onlineMembers);
+            }
+        }
+        return new PartyResolution(initiator.getUniqueId(), List.of(initiator));
+    }
+
     private void spawnEncounter(DungeonInstance instance) {
         DungeonData data = instance.getData();
-        var world = Bukkit.getWorld(data.getWorld());
+        DungeonArena arena = data.getArenas().get(instance.getArenaIndex());
+        var world = Bukkit.getWorld(arena.world());
         if (world == null) {
             return;
         }
-        Location entry = new Location(world, data.getX(), data.getY(), data.getZ());
+        Location entry = new Location(world, arena.x(), arena.y(), arena.z());
         for (Map.Entry<String, Integer> entry2 : data.getEnemies().entrySet()) {
             for (int i = 0; i < entry2.getValue(); i++) {
                 combatApi.spawnMonster(entry2.getKey(), jitter(entry)).ifPresent(mob -> track(instance, mob));
@@ -196,13 +222,6 @@ public final class DungeonEncounterService {
         }
     }
 
-    private List<Player> gatherNearbyParty(Player initiator, double radius) {
-        double radiusSquared = radius * radius;
-        return initiator.getWorld().getPlayers().stream()
-                .filter(p -> p.getLocation().distanceSquared(initiator.getLocation()) <= radiusSquared)
-                .toList();
-    }
-
     private ChallengeFailure mapFailure(DungeonService.StartFailure failure) {
         return switch (failure) {
             case UNKNOWN_DUNGEON -> ChallengeFailure.UNKNOWN_DUNGEON;
@@ -210,6 +229,7 @@ public final class DungeonEncounterService {
             case PARTY_TOO_LARGE -> ChallengeFailure.PARTY_TOO_LARGE;
             case WORLD_NOT_FOUND -> ChallengeFailure.WORLD_NOT_FOUND;
             case ALREADY_IN_DUNGEON -> ChallengeFailure.ALREADY_IN_DUNGEON;
+            case DUNGEON_FULL -> ChallengeFailure.DUNGEON_FULL;
         };
     }
 }

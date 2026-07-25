@@ -6,6 +6,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import rpg.api.StatusApi;
 import rpg.dungeon.manager.DungeonInstanceManager;
+import rpg.dungeon.model.DungeonArena;
 import rpg.dungeon.model.DungeonData;
 import rpg.dungeon.model.DungeonEndReason;
 import rpg.dungeon.model.DungeonInstance;
@@ -25,7 +26,7 @@ import java.util.UUID;
 public final class DungeonService {
 
     public enum StartFailure {
-        UNKNOWN_DUNGEON, PARTY_TOO_SMALL, PARTY_TOO_LARGE, WORLD_NOT_FOUND, ALREADY_IN_DUNGEON
+        UNKNOWN_DUNGEON, PARTY_TOO_SMALL, PARTY_TOO_LARGE, WORLD_NOT_FOUND, ALREADY_IN_DUNGEON, DUNGEON_FULL
     }
 
     private final DungeonRepository repository;
@@ -57,13 +58,21 @@ public final class DungeonService {
                 return Optional.of(StartFailure.ALREADY_IN_DUNGEON);
             }
         }
-        var world = Bukkit.getWorld(data.getWorld());
+
+        List<DungeonArena> arenas = data.getArenas();
+        Optional<Integer> arenaIndex = instanceManager.tryAcquireArena(dungeonId, arenas.size());
+        if (arenaIndex.isEmpty()) {
+            return Optional.of(StartFailure.DUNGEON_FULL);
+        }
+        DungeonArena arena = arenas.get(arenaIndex.get());
+        var world = Bukkit.getWorld(arena.world());
         if (world == null) {
+            instanceManager.release(dungeonId, arenaIndex.get());
             return Optional.of(StartFailure.WORLD_NOT_FOUND);
         }
 
-        DungeonInstance instance = new DungeonInstance(data);
-        Location entry = new Location(world, data.getX(), data.getY(), data.getZ());
+        DungeonInstance instance = new DungeonInstance(data, arenaIndex.get());
+        Location entry = new Location(world, arena.x(), arena.y(), arena.z());
         for (Player player : party) {
             instance.addMember(player.getUniqueId(), player.getLocation());
             player.teleport(entry);

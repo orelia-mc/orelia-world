@@ -18,13 +18,15 @@ public final class DungeonInstance {
 
     private final UUID id = UUID.randomUUID();
     private final DungeonData data;
+    private final int arenaIndex;
     private final Map<UUID, Location> membersAndReturnLocations = new ConcurrentHashMap<>();
     private final Set<UUID> aliveMonsterIds = ConcurrentHashMap.newKeySet();
     private volatile DungeonInstanceStatus status = DungeonInstanceStatus.ACTIVE;
     private volatile BukkitTask timeoutTask;
 
-    public DungeonInstance(DungeonData data) {
+    public DungeonInstance(DungeonData data, int arenaIndex) {
         this.data = data;
+        this.arenaIndex = arenaIndex;
     }
 
     public UUID getId() {
@@ -33,6 +35,11 @@ public final class DungeonInstance {
 
     public DungeonData getData() {
         return data;
+    }
+
+    /** Index into {@link DungeonData#getArenas()} this run was assigned - freed by {@link rpg.dungeon.manager.DungeonInstanceManager#remove}. */
+    public int getArenaIndex() {
+        return arenaIndex;
     }
 
     public void addMember(UUID playerId, Location returnLocation) {

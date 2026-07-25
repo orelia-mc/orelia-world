@@ -40,6 +40,9 @@ dependencies {
     // (ModuleManager/ConfigManager/PlayerDataManager/PlayerDataComponent...) - never
     // gameplay-module internals like rpg.status/rpg.item directly.
     compileOnly("com.github.orelia-mc:orelia-core:main-SNAPSHOT")
+    // Soft dependency (plugin.yml softdepend) - only rpg.extra.api.PartyApi, used to resolve a
+    // dungeon challenger's real party. Null-guarded everywhere; orelia-extra may not be installed.
+    compileOnly("com.github.orelia-mc:orelia-extra:main-SNAPSHOT")
 
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")

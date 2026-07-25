@@ -1,10 +1,13 @@
 # Dungeon definitions (SOW section 15). type: NORMAL | STORY | RAID | SOLO | PARTY
 #
+# arenas: physical entry points this dungeon can spawn a run at - one concurrent run per
+#   arena, so N arenas means up to N parties can challenge this dungeon at the same time.
+#   Challenging while every arena is occupied is rejected (dungeon.challenge-failed.dungeon_full).
 # enemies: monsters.yml ids -> count that must be killed to clear the dungeon.
 # boss-id: optional bosses.yml id, spawned alongside the enemies. Omit for a boss-less dungeon.
 # time-limit-seconds: killing every enemy (and the boss, if any) within this limit clears the
 #   dungeon and grants reward-exp/reward-money; running out of time force-exits with no reward.
-config-version: 2
+config-version: 3
 
 dungeons:
   goblin_cave:
@@ -12,10 +15,19 @@ dungeons:
     type: NORMAL
     min-party-size: 1
     max-party-size: 4
-    world: world
-    x: 100
-    y: 64
-    z: 100
+    arenas:
+      - world: world
+        x: 100
+        y: 64
+        z: 100
+      - world: world
+        x: 150
+        y: 64
+        z: 100
+      - world: world
+        x: 200
+        y: 64
+        z: 100
     reward-exp: 150
     reward-money: 80
     enemies:
@@ -29,10 +41,19 @@ dungeons:
     type: SOLO
     min-party-size: 1
     max-party-size: 1
-    world: world
-    x: 200
-    y: 64
-    z: 200
+    arenas:
+      - world: world
+        x: 200
+        y: 64
+        z: 200
+      - world: world
+        x: 250
+        y: 64
+        z: 200
+      - world: world
+        x: 300
+        y: 64
+        z: 200
     reward-exp: 80
     reward-money: 40
     enemies:
@@ -44,10 +65,19 @@ dungeons:
     type: RAID
     min-party-size: 5
     max-party-size: 10
-    world: world
-    x: 300
-    y: 70
-    z: 300
+    arenas:
+      - world: world
+        x: 300
+        y: 70
+        z: 300
+      - world: world
+        x: 350
+        y: 70
+        z: 300
+      - world: world
+        x: 400
+        y: 70
+        z: 300
     reward-exp: 1000
     reward-money: 500
     enemies:

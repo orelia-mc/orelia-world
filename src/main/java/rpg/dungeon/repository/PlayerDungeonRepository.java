@@ -58,6 +58,24 @@ public final class PlayerDungeonRepository implements SchemaOwner {
         return new PlayerDungeonComponent(uuid, unlocked);
     }
 
+    /**
+     * Direct DB lookup, independent of {@link rpg.core.player.PlayerDataManager}'s in-memory
+     * component - used to check a dungeon party's leader even when the leader isn't online.
+     */
+    public boolean isUnlocked(UUID uuid, String dungeonId) {
+        try (Connection connection = databaseManager.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT 1 FROM dungeon_unlocked WHERE uuid = ? AND dungeon_id = ?")) {
+            statement.setString(1, uuid.toString());
+            statement.setString(2, dungeonId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to check unlocked dungeon " + dungeonId + " for " + uuid, e);
+        }
+    }
+
     public void save(PlayerDungeonComponent component) {
         try (Connection connection = databaseManager.getConnection()) {
             for (Map.Entry<String, Instant> entry : component.getUnlockedDungeonsWithTimestamps().entrySet()) {

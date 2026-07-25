@@ -79,6 +79,7 @@ dungeon:
     party_too_large: "&%c挑戦できる人数の上限を超えています。"
     world_not_found: "&%cダンジョンのワールドが見つかりません。"
     already_in_dungeon: "&%c既にダンジョンに挑戦中です。"
+    dungeon_full: "&%cこのダンジョンは現在満員です。しばらくしてから挑戦してください。"
   cleared: "&%a&lダンジョンをクリアしました！"
   timed-out: "&%c制限時間切れです。ダンジョンから退出しました。"
   retired: "&%eダンジョンから離脱しました。"
