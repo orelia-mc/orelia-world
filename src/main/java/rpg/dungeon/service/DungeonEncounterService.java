@@ -7,6 +7,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import rpg.api.CombatApi;
 import rpg.api.RelicApi;
+import rpg.api.StatusApi;
 import rpg.core.config.ConfigManager;
 import rpg.core.message.MessageManager;
 import rpg.core.player.PlayerDataManager;
@@ -39,18 +40,26 @@ import java.util.UUID;
 public final class DungeonEncounterService {
 
     public enum ChallengeFailure {
-        NOT_UNLOCKED, UNKNOWN_DUNGEON, PARTY_TOO_SMALL, PARTY_TOO_LARGE, WORLD_NOT_FOUND, ALREADY_IN_DUNGEON, DUNGEON_FULL
+        NOT_UNLOCKED, UNKNOWN_DUNGEON, PARTY_TOO_SMALL, PARTY_TOO_LARGE, WORLD_NOT_FOUND, ALREADY_IN_DUNGEON,
+        DUNGEON_FULL, INVALID_DIFFICULTY
     }
+
+    /** Fixed difficulty tiers a player may challenge at, each an upper bound on their own character level. */
+    public static final List<Integer> DIFFICULTY_TIERS = List.of(5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100);
 
     private static final double SPAWN_JITTER_RADIUS = 2.5;
 
     private static final int DEFAULT_RELIC_DROP_MIN = 1;
     private static final int DEFAULT_RELIC_DROP_MAX = 3;
 
+    /** Delay between a successful arena reservation and the actual teleport/enemy spawn - the "10秒後に挑戦" warmup. */
+    private static final long ENTRY_COUNTDOWN_TICKS = 200L;
+
     private final DungeonService dungeonService;
     private final DungeonInstanceManager instanceManager;
     private final CombatApi combatApi;
     private final RelicApi relicApi;
+    private final StatusApi statusApi;
     private final SchedulerService schedulerService;
     private final ConfigManager configManager;
     private final PlayerDungeonRepository playerDungeonRepository;
@@ -65,7 +74,7 @@ public final class DungeonEncounterService {
     }
 
     public DungeonEncounterService(DungeonService dungeonService, DungeonInstanceManager instanceManager,
-                                    CombatApi combatApi, RelicApi relicApi, SchedulerService schedulerService,
+                                    CombatApi combatApi, RelicApi relicApi, StatusApi statusApi, SchedulerService schedulerService,
                                     ConfigManager configManager, PlayerDungeonRepository playerDungeonRepository,
                                     PlayerDataManager playerDataManager, PartyApi partyApi,
                                     QuestProgressService questProgressService, MessageManager messages) {
@@ -73,6 +82,7 @@ public final class DungeonEncounterService {
         this.instanceManager = instanceManager;
         this.combatApi = combatApi;
         this.relicApi = relicApi;
+        this.statusApi = statusApi;
         this.schedulerService = schedulerService;
         this.configManager = configManager;
         this.playerDungeonRepository = playerDungeonRepository;
@@ -82,12 +92,31 @@ public final class DungeonEncounterService {
         this.messages = messages;
     }
 
+    /** {@code difficulty}-less challenge (unscaled enemies) - see {@link #challenge(Player, String, Integer)}. */
+    public Optional<ChallengeFailure> challenge(Player initiator, String dungeonId) {
+        return challenge(initiator, dungeonId, null);
+    }
+
     /**
      * Attempts to start a dungeon run for {@code initiator}'s real party (see
      * {@link #resolveParty}) - a solo player if they aren't in one. Only the party leader
-     * needs to have unlocked the dungeon; other online members ride along.
+     * needs to have unlocked the dungeon; other online members ride along. {@code difficulty}
+     * (one of {@link #DIFFICULTY_TIERS}, capped at {@code initiator}'s own character level, or
+     * {@code null} for unscaled) is validated against {@code initiator} regardless of who the
+     * resolved party leader is - it's the challenger's own choice, not the leader's.
+     *
+     * <p>On success, the arena is reserved and the party's return locations captured
+     * immediately (so a 4th concurrent party is still rejected right away as
+     * {@link ChallengeFailure#DUNGEON_FULL}), but the actual teleport/enemy spawn happens
+     * {@link #ENTRY_COUNTDOWN_TICKS} later - see {@link #enterInstance}.
      */
-    public Optional<ChallengeFailure> challenge(Player initiator, String dungeonId) {
+    public Optional<ChallengeFailure> challenge(Player initiator, String dungeonId, Integer difficulty) {
+        if (difficulty != null) {
+            int level = statusApi.getLevel(initiator.getUniqueId()).orElse(1);
+            if (!DIFFICULTY_TIERS.contains(difficulty) || difficulty > level) {
+                return Optional.of(ChallengeFailure.INVALID_DIFFICULTY);
+            }
+        }
         PartyResolution resolution = resolveParty(initiator);
         if (!isUnlockedForLeader(resolution.leaderId(), dungeonId)) {
             return Optional.of(ChallengeFailure.NOT_UNLOCKED);
@@ -99,9 +128,27 @@ public final class DungeonEncounterService {
         }
 
         DungeonInstance instance = instanceManager.getByPlayer(initiator.getUniqueId()).orElseThrow();
-        spawnEncounter(instance);
-        scheduleTimeout(instance);
+        for (Player member : resolution.members()) {
+            messages.send(member, "dungeon.entry-countdown", "seconds", ENTRY_COUNTDOWN_TICKS / 20L);
+        }
+        schedulerService.runLater(() -> enterInstance(instance, difficulty), ENTRY_COUNTDOWN_TICKS);
         return Optional.empty();
+    }
+
+    /**
+     * Fires {@link #ENTRY_COUNTDOWN_TICKS} after a successful {@link #challenge} - teleports in
+     * and spawns the encounter, unless every queued member has since logged out, in which case
+     * the reservation is simply released instead of spawning enemies into an empty arena.
+     */
+    private void enterInstance(DungeonInstance instance, Integer difficulty) {
+        boolean anyoneOnline = instance.getMembers().keySet().stream().anyMatch(id -> Bukkit.getPlayer(id) != null);
+        if (!anyoneOnline) {
+            instanceManager.remove(instance.getId());
+            return;
+        }
+        dungeonService.teleportIn(instance);
+        spawnEncounter(instance, difficulty);
+        scheduleTimeout(instance);
     }
 
     /** Manually ends the run the given player is currently in. Returns false if they aren't in one. */
@@ -118,7 +165,9 @@ public final class DungeonEncounterService {
      * Debug helper: starts a solo run for {@code player} bypassing the unlock check (party-size
      * validation against {@code min-party-size} still applies via {@link DungeonService#start},
      * since a single player is the whole "party" here - a dungeon requiring more than one
-     * member will still fail with {@link ChallengeFailure#PARTY_TOO_SMALL}).
+     * member will still fail with {@link ChallengeFailure#PARTY_TOO_SMALL}). Unlike
+     * {@link #challenge}, skips the entry countdown entirely - teleports and spawns immediately,
+     * since this is a testplay convenience, not a real challenge flow.
      */
     public Optional<ChallengeFailure> forceStart(Player player, String dungeonId) {
         Optional<DungeonService.StartFailure> failure = dungeonService.start(dungeonId, List.of(player));
@@ -126,7 +175,8 @@ public final class DungeonEncounterService {
             return Optional.of(mapFailure(failure.get()));
         }
         DungeonInstance instance = instanceManager.getByPlayer(player.getUniqueId()).orElseThrow();
-        spawnEncounter(instance);
+        dungeonService.teleportIn(instance);
+        spawnEncounter(instance, null);
         scheduleTimeout(instance);
         return Optional.empty();
     }
@@ -183,7 +233,7 @@ public final class DungeonEncounterService {
         return new PartyResolution(initiator.getUniqueId(), List.of(initiator));
     }
 
-    private void spawnEncounter(DungeonInstance instance) {
+    private void spawnEncounter(DungeonInstance instance, Integer difficulty) {
         DungeonData data = instance.getData();
         DungeonArena arena = data.getArenas().get(instance.getArenaIndex());
         var world = Bukkit.getWorld(arena.world());
@@ -193,11 +243,11 @@ public final class DungeonEncounterService {
         Location entry = new Location(world, arena.x(), arena.y(), arena.z());
         for (Map.Entry<String, Integer> entry2 : data.getEnemies().entrySet()) {
             for (int i = 0; i < entry2.getValue(); i++) {
-                combatApi.spawnMonster(entry2.getKey(), jitter(entry)).ifPresent(mob -> track(instance, mob));
+                combatApi.spawnMonster(entry2.getKey(), jitter(entry), difficulty).ifPresent(mob -> track(instance, mob));
             }
         }
         if (data.getBossId() != null) {
-            combatApi.spawnBoss(data.getBossId(), jitter(entry)).ifPresent(boss -> track(instance, boss));
+            combatApi.spawnBoss(data.getBossId(), jitter(entry), difficulty).ifPresent(boss -> track(instance, boss));
         }
     }
 

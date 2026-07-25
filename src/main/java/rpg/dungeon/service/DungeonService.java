@@ -42,6 +42,13 @@ public final class DungeonService {
         this.economy = economy;
     }
 
+    /**
+     * Reserves an arena and registers the instance, capturing each member's current location
+     * as their return point - but does NOT teleport them in yet, so a challenge can show a
+     * pre-entry countdown (see {@code DungeonEncounterService#challenge}) while still rejecting
+     * a 4th concurrent party immediately via {@link StartFailure#DUNGEON_FULL}. Call
+     * {@link #teleportIn} once the countdown elapses.
+     */
     public Optional<StartFailure> start(String dungeonId, List<Player> party) {
         DungeonData data = repository.findById(dungeonId).orElse(null);
         if (data == null) {
@@ -72,13 +79,27 @@ public final class DungeonService {
         }
 
         DungeonInstance instance = new DungeonInstance(data, arenaIndex.get());
-        Location entry = new Location(world, arena.x(), arena.y(), arena.z());
         for (Player player : party) {
             instance.addMember(player.getUniqueId(), player.getLocation());
-            player.teleport(entry);
         }
         instanceManager.register(instance);
         return Optional.empty();
+    }
+
+    /** Teleports every currently-online member of {@code instance} to its arena's entry point - called once the pre-entry countdown elapses. */
+    public void teleportIn(DungeonInstance instance) {
+        DungeonArena arena = instance.getData().getArenas().get(instance.getArenaIndex());
+        var world = Bukkit.getWorld(arena.world());
+        if (world == null) {
+            return;
+        }
+        Location entry = new Location(world, arena.x(), arena.y(), arena.z());
+        for (UUID memberId : instance.getMembers().keySet()) {
+            Player member = Bukkit.getPlayer(memberId);
+            if (member != null) {
+                member.teleport(entry);
+            }
+        }
     }
 
     /** Ends the run the given player is in (if any), rewarding the whole party only when {@code reason} is {@link DungeonEndReason#CLEARED}. */

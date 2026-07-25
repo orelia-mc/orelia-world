@@ -90,17 +90,20 @@ public final class DungeonModule implements WorldModule {
         plugin.getPlayerDataManager().registerLoader(new DungeonPlayerManager(playerDungeonRepository));
 
         this.dungeonService = new DungeonService(repository, instanceManager, statusApi, economy);
-        this.encounterService = new DungeonEncounterService(dungeonService, instanceManager, combatApi, relicApi,
+        this.encounterService = new DungeonEncounterService(dungeonService, instanceManager, combatApi, relicApi, statusApi,
                 plugin.getSchedulerService(), plugin.getConfigManager(), playerDungeonRepository,
                 plugin.getPlayerDataManager(), partyApi, questProgressService, plugin.getMessageManager());
+
+        GuiManager guiManager = new GuiManager();
+        DungeonGuiScreen guiScreen = new DungeonGuiScreen(repository, encounterService, plugin.getPlayerDataManager(),
+                statusApi, guiManager, plugin.getMessageManager());
 
         plugin.getServer().getPluginManager().registerEvents(new DungeonQuitListener(instanceManager), plugin);
         plugin.getServer().getPluginManager().registerEvents(new DungeonMobDeathListener(encounterService), plugin);
         plugin.getServer().getPluginManager().registerEvents(
-                new DungeonBlockInteractListener(blockRepository, encounterService, plugin.getPlayerDataManager(), plugin.getMessageManager()), plugin);
+                new DungeonBlockInteractListener(blockRepository, guiScreen, guiManager, plugin.getPlayerDataManager(), plugin.getMessageManager()), plugin);
 
-        DungeonGuiScreen guiScreen = new DungeonGuiScreen(repository, encounterService, plugin.getPlayerDataManager(), plugin.getMessageManager());
-        DungeonCommand dungeonCommand = new DungeonCommand(encounterService, guiScreen, new GuiManager(),
+        DungeonCommand dungeonCommand = new DungeonCommand(encounterService, guiScreen, guiManager,
                 plugin.getPlayerDataManager(), plugin.getMessageManager());
         String dungeonDescription = "ダンジョンの一覧・挑戦・離脱を行います。";
         plugin.getPlayerCommandRegistry().register("dungeon", dungeonCommand, dungeonDescription, "dungeon [list]|start <id>|retire");
