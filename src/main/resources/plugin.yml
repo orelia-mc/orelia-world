@@ -6,4 +6,4 @@ author: rasp1220
 description: Orelia content plugin - quest, NPC, dialogue, story, dungeon, cutscene, event
 folia-supported: false
 depend: [OreliaCore]
-softdepend: [Vault]
+softdepend: [Vault, OreliaExtra]

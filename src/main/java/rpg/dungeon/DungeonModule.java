@@ -19,6 +19,7 @@ import rpg.dungeon.repository.DungeonRepository;
 import rpg.dungeon.repository.PlayerDungeonRepository;
 import rpg.dungeon.service.DungeonEncounterService;
 import rpg.dungeon.service.DungeonService;
+import rpg.extra.api.PartyApi;
 import rpg.gui.framework.GuiManager;
 import rpg.quest.QuestModule;
 import rpg.quest.service.QuestProgressService;
@@ -63,16 +64,14 @@ public final class DungeonModule implements WorldModule {
             throw new IllegalStateException("dungeon module requires OreliaCore's DatabaseManager");
         }
         Economy economy = plugin.getServer().getServicesManager().load(Economy.class);
+        // Soft dependency - only used to resolve a dungeon challenger's real party; null when
+        // OreliaExtra isn't installed, in which case every challenge falls back to solo.
+        PartyApi partyApi = plugin.getServer().getServicesManager().load(PartyApi.class);
         QuestProgressService questProgressService = plugin.getModuleManager().get(QuestModule.class)
                 .orElseThrow(() -> new IllegalStateException("dungeon module requires quest module"))
                 .getProgressService();
 
         reloadDungeons();
-
-        this.dungeonService = new DungeonService(repository, instanceManager, statusApi, economy);
-        this.encounterService = new DungeonEncounterService(dungeonService, instanceManager, combatApi,
-                plugin.getSchedulerService(), plugin.getConfigManager(), plugin.getPlayerDataManager(),
-                questProgressService, plugin.getMessageManager());
 
         PlayerDungeonRepository playerDungeonRepository = new PlayerDungeonRepository(databaseManager);
         this.blockRepository = new DungeonBlockRepository(databaseManager);
@@ -84,6 +83,11 @@ public final class DungeonModule implements WorldModule {
             plugin.getLogger().log(Level.SEVERE, "Failed to initialize dungeon schema", e);
         }
         plugin.getPlayerDataManager().registerLoader(new DungeonPlayerManager(playerDungeonRepository));
+
+        this.dungeonService = new DungeonService(repository, instanceManager, statusApi, economy);
+        this.encounterService = new DungeonEncounterService(dungeonService, instanceManager, combatApi,
+                plugin.getSchedulerService(), playerDungeonRepository, partyApi,
+                questProgressService, plugin.getMessageManager());
 
         plugin.getServer().getPluginManager().registerEvents(new DungeonQuitListener(instanceManager), plugin);
         plugin.getServer().getPluginManager().registerEvents(new DungeonMobDeathListener(encounterService), plugin);

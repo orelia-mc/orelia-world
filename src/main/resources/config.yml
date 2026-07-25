@@ -6,8 +6,3 @@ quest:
   # How often (in ticks) each online player's COLLECT_ITEM / DELIVER_ITEM / REACH_LOCATION
   # objectives are re-checked. 40 ticks = 2 seconds.
   objective-check-period-ticks: 40
-
-dungeon:
-  # How far (in blocks) around the player who triggers a dungeon challenge to look for
-  # other online players to auto-include in the party. Always includes the triggering player.
-  party-gather-radius: 15
