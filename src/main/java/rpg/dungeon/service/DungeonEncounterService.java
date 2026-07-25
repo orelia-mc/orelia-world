@@ -9,12 +9,14 @@ import rpg.api.CombatApi;
 import rpg.api.RelicApi;
 import rpg.core.config.ConfigManager;
 import rpg.core.message.MessageManager;
+import rpg.core.player.PlayerDataManager;
 import rpg.core.scheduler.SchedulerService;
 import rpg.dungeon.manager.DungeonInstanceManager;
 import rpg.dungeon.model.DungeonArena;
 import rpg.dungeon.model.DungeonData;
 import rpg.dungeon.model.DungeonEndReason;
 import rpg.dungeon.model.DungeonInstance;
+import rpg.dungeon.model.PlayerDungeonComponent;
 import rpg.dungeon.repository.PlayerDungeonRepository;
 import rpg.extra.api.PartyApi;
 import rpg.quest.service.QuestProgressService;
@@ -52,6 +54,7 @@ public final class DungeonEncounterService {
     private final SchedulerService schedulerService;
     private final ConfigManager configManager;
     private final PlayerDungeonRepository playerDungeonRepository;
+    private final PlayerDataManager playerDataManager;
     private final PartyApi partyApi;
     private final QuestProgressService questProgressService;
     private final MessageManager messages;
@@ -64,7 +67,8 @@ public final class DungeonEncounterService {
     public DungeonEncounterService(DungeonService dungeonService, DungeonInstanceManager instanceManager,
                                     CombatApi combatApi, RelicApi relicApi, SchedulerService schedulerService,
                                     ConfigManager configManager, PlayerDungeonRepository playerDungeonRepository,
-                                    PartyApi partyApi, QuestProgressService questProgressService, MessageManager messages) {
+                                    PlayerDataManager playerDataManager, PartyApi partyApi,
+                                    QuestProgressService questProgressService, MessageManager messages) {
         this.dungeonService = dungeonService;
         this.instanceManager = instanceManager;
         this.combatApi = combatApi;
@@ -72,6 +76,7 @@ public final class DungeonEncounterService {
         this.schedulerService = schedulerService;
         this.configManager = configManager;
         this.playerDungeonRepository = playerDungeonRepository;
+        this.playerDataManager = playerDataManager;
         this.partyApi = partyApi;
         this.questProgressService = questProgressService;
         this.messages = messages;
@@ -84,7 +89,7 @@ public final class DungeonEncounterService {
      */
     public Optional<ChallengeFailure> challenge(Player initiator, String dungeonId) {
         PartyResolution resolution = resolveParty(initiator);
-        if (!playerDungeonRepository.isUnlocked(resolution.leaderId(), dungeonId)) {
+        if (!isUnlockedForLeader(resolution.leaderId(), dungeonId)) {
             return Optional.of(ChallengeFailure.NOT_UNLOCKED);
         }
 
@@ -138,6 +143,23 @@ public final class DungeonEncounterService {
                 forceEnd(instance, DungeonEndReason.CLEARED);
             }
         });
+    }
+
+    /**
+     * Whether {@code leaderId} has discovered this dungeon. Prefers the in-memory
+     * {@link PlayerDungeonComponent} when the leader is online - {@link PlayerDungeonRepository}'s
+     * DB row only reflects a fresh {@code unlock()} once the periodic autosave or quit-save
+     * runs, so a leader challenging immediately after discovering their own dungeon (the most
+     * common case: a solo player, or a party leader) would otherwise see a stale "not unlocked"
+     * result. Falls back to the DB only when the leader isn't online to have an in-memory copy.
+     */
+    private boolean isUnlockedForLeader(UUID leaderId, String dungeonId) {
+        Optional<PlayerDungeonComponent> online = playerDataManager.get(leaderId)
+                .flatMap(data -> data.component(PlayerDungeonComponent.class));
+        if (online.isPresent()) {
+            return online.get().isUnlocked(dungeonId);
+        }
+        return playerDungeonRepository.isUnlocked(leaderId, dungeonId);
     }
 
     /**
