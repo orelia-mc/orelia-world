@@ -91,8 +91,8 @@ public final class DungeonModule implements WorldModule {
 
         this.dungeonService = new DungeonService(repository, instanceManager, statusApi, economy);
         this.encounterService = new DungeonEncounterService(dungeonService, instanceManager, combatApi, relicApi,
-                plugin.getSchedulerService(), plugin.getConfigManager(), playerDungeonRepository, partyApi,
-                questProgressService, plugin.getMessageManager());
+                plugin.getSchedulerService(), plugin.getConfigManager(), playerDungeonRepository,
+                plugin.getPlayerDataManager(), partyApi, questProgressService, plugin.getMessageManager());
 
         plugin.getServer().getPluginManager().registerEvents(new DungeonQuitListener(instanceManager), plugin);
         plugin.getServer().getPluginManager().registerEvents(new DungeonMobDeathListener(encounterService), plugin);
