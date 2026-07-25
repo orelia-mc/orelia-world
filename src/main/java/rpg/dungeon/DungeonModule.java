@@ -3,6 +3,7 @@ package rpg.dungeon;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.configuration.file.YamlConfiguration;
 import rpg.api.CombatApi;
+import rpg.api.RelicApi;
 import rpg.api.StatusApi;
 import rpg.core.command.CommandAliasUtil;
 import rpg.database.manager.DatabaseManager;
@@ -59,6 +60,10 @@ public final class DungeonModule implements WorldModule {
         if (combatApi == null) {
             throw new IllegalStateException("dungeon module requires OreliaCore's CombatApi");
         }
+        RelicApi relicApi = plugin.getServer().getServicesManager().load(RelicApi.class);
+        if (relicApi == null) {
+            throw new IllegalStateException("dungeon module requires OreliaCore's RelicApi");
+        }
         DatabaseManager databaseManager = plugin.getServer().getServicesManager().load(DatabaseManager.class);
         if (databaseManager == null) {
             throw new IllegalStateException("dungeon module requires OreliaCore's DatabaseManager");
@@ -85,8 +90,8 @@ public final class DungeonModule implements WorldModule {
         plugin.getPlayerDataManager().registerLoader(new DungeonPlayerManager(playerDungeonRepository));
 
         this.dungeonService = new DungeonService(repository, instanceManager, statusApi, economy);
-        this.encounterService = new DungeonEncounterService(dungeonService, instanceManager, combatApi,
-                plugin.getSchedulerService(), playerDungeonRepository, partyApi,
+        this.encounterService = new DungeonEncounterService(dungeonService, instanceManager, combatApi, relicApi,
+                plugin.getSchedulerService(), plugin.getConfigManager(), playerDungeonRepository, partyApi,
                 questProgressService, plugin.getMessageManager());
 
         plugin.getServer().getPluginManager().registerEvents(new DungeonQuitListener(instanceManager), plugin);

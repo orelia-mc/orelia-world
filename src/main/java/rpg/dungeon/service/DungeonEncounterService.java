@@ -6,6 +6,8 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import rpg.api.CombatApi;
+import rpg.api.RelicApi;
+import rpg.core.config.ConfigManager;
 import rpg.core.message.MessageManager;
 import rpg.core.scheduler.SchedulerService;
 import rpg.dungeon.manager.DungeonInstanceManager;
@@ -40,10 +42,15 @@ public final class DungeonEncounterService {
 
     private static final double SPAWN_JITTER_RADIUS = 2.5;
 
+    private static final int DEFAULT_RELIC_DROP_MIN = 1;
+    private static final int DEFAULT_RELIC_DROP_MAX = 3;
+
     private final DungeonService dungeonService;
     private final DungeonInstanceManager instanceManager;
     private final CombatApi combatApi;
+    private final RelicApi relicApi;
     private final SchedulerService schedulerService;
+    private final ConfigManager configManager;
     private final PlayerDungeonRepository playerDungeonRepository;
     private final PartyApi partyApi;
     private final QuestProgressService questProgressService;
@@ -55,13 +62,15 @@ public final class DungeonEncounterService {
     }
 
     public DungeonEncounterService(DungeonService dungeonService, DungeonInstanceManager instanceManager,
-                                    CombatApi combatApi, SchedulerService schedulerService,
-                                    PlayerDungeonRepository playerDungeonRepository, PartyApi partyApi,
-                                    QuestProgressService questProgressService, MessageManager messages) {
+                                    CombatApi combatApi, RelicApi relicApi, SchedulerService schedulerService,
+                                    ConfigManager configManager, PlayerDungeonRepository playerDungeonRepository,
+                                    PartyApi partyApi, QuestProgressService questProgressService, MessageManager messages) {
         this.dungeonService = dungeonService;
         this.instanceManager = instanceManager;
         this.combatApi = combatApi;
+        this.relicApi = relicApi;
         this.schedulerService = schedulerService;
+        this.configManager = configManager;
         this.playerDungeonRepository = playerDungeonRepository;
         this.partyApi = partyApi;
         this.questProgressService = questProgressService;
@@ -195,8 +204,32 @@ public final class DungeonEncounterService {
         dungeonService.finish(anyMember, reason);
         if (reason == DungeonEndReason.CLEARED) {
             memberIds.forEach(id -> questProgressService.onDungeonCleared(id, dungeonId));
+            grantRelicDrops(instance, memberIds);
         }
         notifyOutcome(memberIds, reason);
+    }
+
+    /** Only bossed dungeons drop relics - see {@code rpg.api.RelicApi#generateRelic}, dungeons.yml's boss-id. */
+    private void grantRelicDrops(DungeonInstance instance, Set<UUID> memberIds) {
+        if (instance.getData().getBossId() == null) {
+            return;
+        }
+        String dungeonId = instance.getData().getId();
+        var config = configManager.get("config.yml").get();
+        int min = config.getInt("dungeon.relic-drop-min", DEFAULT_RELIC_DROP_MIN);
+        int max = Math.max(min, config.getInt("dungeon.relic-drop-max", DEFAULT_RELIC_DROP_MAX));
+        for (UUID memberId : memberIds) {
+            Player member = Bukkit.getPlayer(memberId);
+            if (member == null) {
+                continue;
+            }
+            int count = min + random.nextInt(max - min + 1);
+            for (int i = 0; i < count; i++) {
+                relicApi.generateRelic(dungeonId).ifPresent(relic ->
+                        member.getInventory().addItem(relic).values()
+                                .forEach(leftover -> member.getWorld().dropItemNaturally(member.getLocation(), leftover)));
+            }
+        }
     }
 
     private void despawnRemainingMobs(DungeonInstance instance) {
