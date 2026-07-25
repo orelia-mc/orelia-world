@@ -9,26 +9,30 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import rpg.core.message.MessageManager;
 import rpg.core.player.PlayerDataManager;
+import rpg.dungeon.gui.DungeonGuiScreen;
 import rpg.dungeon.model.PlayerDungeonComponent;
 import rpg.dungeon.repository.DungeonBlockRepository;
-import rpg.dungeon.service.DungeonEncounterService;
+import rpg.gui.framework.GuiManager;
 
 /**
  * Right-clicking a registered trigger block (see {@code /oladmin dungeonblock set}) unlocks
  * the associated dungeon on first click - a pure "discovery" that does not also start a run -
- * and attempts to start a run on every click after that.
+ * and opens the difficulty-select screen ({@link DungeonGuiScreen#buildDifficultySelect}) on
+ * every click after that.
  */
 public final class DungeonBlockInteractListener implements Listener {
 
     private final DungeonBlockRepository blockRepository;
-    private final DungeonEncounterService encounterService;
+    private final DungeonGuiScreen guiScreen;
+    private final GuiManager guiManager;
     private final PlayerDataManager playerDataManager;
     private final MessageManager messages;
 
-    public DungeonBlockInteractListener(DungeonBlockRepository blockRepository, DungeonEncounterService encounterService,
-                                         PlayerDataManager playerDataManager, MessageManager messages) {
+    public DungeonBlockInteractListener(DungeonBlockRepository blockRepository, DungeonGuiScreen guiScreen,
+                                         GuiManager guiManager, PlayerDataManager playerDataManager, MessageManager messages) {
         this.blockRepository = blockRepository;
-        this.encounterService = encounterService;
+        this.guiScreen = guiScreen;
+        this.guiManager = guiManager;
         this.playerDataManager = playerDataManager;
         this.messages = messages;
     }
@@ -61,8 +65,6 @@ public final class DungeonBlockInteractListener implements Listener {
             messages.send(player, "dungeon.unlocked", "dungeon", dungeonId);
             return;
         }
-        encounterService.challenge(player, dungeonId).ifPresentOrElse(
-                failure -> messages.send(player, "dungeon.challenge-failed." + failure.name().toLowerCase()),
-                () -> messages.send(player, "dungeon.challenge-started", "dungeon", dungeonId));
+        guiManager.open(player, guiScreen.buildDifficultySelect(player, dungeonId));
     }
 }

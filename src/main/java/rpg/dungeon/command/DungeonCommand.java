@@ -52,9 +52,17 @@ public final class DungeonCommand implements CommandExecutor, TabCompleter {
                     messages.send(player, "dungeon.usage");
                     return true;
                 }
-                encounterService.challenge(player, args[1]).ifPresentOrElse(
-                        failure -> messages.send(player, "dungeon.challenge-failed." + failure.name().toLowerCase()),
-                        () -> messages.send(player, "dungeon.challenge-started", "dungeon", args[1]));
+                Integer difficulty = null;
+                if (args.length >= 3) {
+                    try {
+                        difficulty = Integer.parseInt(args[2]);
+                    } catch (NumberFormatException e) {
+                        messages.send(player, "dungeon.invalid-difficulty");
+                        return true;
+                    }
+                }
+                encounterService.challenge(player, args[1], difficulty)
+                        .ifPresent(failure -> messages.send(player, "dungeon.challenge-failed." + failure.name().toLowerCase()));
             }
             case "retire" -> {
                 boolean retired = encounterService.retire(player);
@@ -77,6 +85,10 @@ public final class DungeonCommand implements CommandExecutor, TabCompleter {
             if (component != null) {
                 return TabCompletions.matching(component.getUnlockedDungeonIds(), args[1]);
             }
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("start")) {
+            return TabCompletions.matching(
+                    DungeonEncounterService.DIFFICULTY_TIERS.stream().map(String::valueOf).toList(), args[2]);
         }
         return List.of();
     }

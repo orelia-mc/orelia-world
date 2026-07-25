@@ -8,7 +8,7 @@
 # config-version tracks this file's schema. Bump it whenever a new top-level section is
 # added - on next startup, ConfigManager appends the new section (with its comments) to any
 # existing messages.yml that's missing it, without touching anything you've already customized.
-config-version: 2
+config-version: 3
 
 prefix: "&%8[&%6Orelia&%8] &r"
 
@@ -68,10 +68,11 @@ npc:
     spawned-all: "&%anpc.ymlに設定済みで、まだ出現していないNPCをすべて設置しました。"
 
 dungeon:
-  usage: "&%e使い方: /ol dungeon &%7[&%elist&%7]&%e&%7|&%estart &%7<&%eid&%7>&%e&%7|&%eretire&%e"
+  usage: "&%e使い方: /ol dungeon &%7[&%elist&%7]&%e&%7|&%estart &%7<&%eid&%7>&%e &%7[&%edifficulty&%7]&%e&%7|&%eretire&%e"
   data-not-loaded: "&%cダンジョンデータがまだ読み込まれていません。"
   unlocked: "&%aダンジョン「{dungeon}」を発見しました！もう一度クリックするか /ol dungeon で挑戦できます。"
-  challenge-started: "&%aダンジョン「{dungeon}」に挑戦を開始しました！"
+  entry-countdown: "&%a{seconds}秒後に挑戦します！その場から動かないでください。"
+  invalid-difficulty: "&%c難易度は数値で指定してください。"
   challenge-failed:
     not_unlocked: "&%cこのダンジョンはまだ発見していません。"
     unknown_dungeon: "&%c不明なダンジョンです。"
@@ -80,6 +81,7 @@ dungeon:
     world_not_found: "&%cダンジョンのワールドが見つかりません。"
     already_in_dungeon: "&%c既にダンジョンに挑戦中です。"
     dungeon_full: "&%cこのダンジョンは現在満員です。しばらくしてから挑戦してください。"
+    invalid_difficulty: "&%c選択できない難易度です（自キャラのレベル以下の難易度のみ選択できます）。"
   cleared: "&%a&lダンジョンをクリアしました！"
   timed-out: "&%c制限時間切れです。ダンジョンから退出しました。"
   retired: "&%eダンジョンから離脱しました。"
