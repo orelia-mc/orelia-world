@@ -4,6 +4,7 @@ import org.bukkit.plugin.ServicesManager;
 import rpg.api.GuiApi;
 import rpg.api.JobApi;
 import rpg.api.SkillApi;
+import rpg.extra.api.AchievementApi;
 import rpg.gui.framework.GuiManager;
 import rpg.quest.QuestModule;
 import rpg.world.core.OreliaWorldPlugin;
@@ -33,6 +34,8 @@ public final class PlayerInfoModule implements WorldModule {
         if (jobApi == null || skillApi == null || guiApi == null) {
             throw new IllegalStateException("playerinfo module requires OreliaCore's JobApi, SkillApi and GuiApi");
         }
+        // Soft dependency - null when OreliaExtra isn't installed, guarded in PlayerInfoGuiScreen.
+        AchievementApi achievementApi = services.load(AchievementApi.class);
 
         QuestModule questModule = plugin.getModuleManager().get(QuestModule.class)
                 .orElseThrow(() -> new IllegalStateException("playerinfo module requires quest module"));
@@ -40,7 +43,8 @@ public final class PlayerInfoModule implements WorldModule {
         GuiManager guiManager = new GuiManager();
         PlayerInfoItemService itemService = new PlayerInfoItemService(new PlayerInfoItemKeys(plugin));
         PlayerInfoGuiScreen guiScreen = new PlayerInfoGuiScreen(
-                questModule.getQuestRepository(), plugin.getPlayerDataManager(), jobApi, skillApi, guiApi, guiManager);
+                questModule.getQuestRepository(), plugin.getPlayerDataManager(), jobApi, skillApi, guiApi,
+                achievementApi, guiManager);
 
         plugin.getServer().getPluginManager().registerEvents(
                 new PlayerInfoItemListener(itemService, guiScreen, guiManager), plugin);

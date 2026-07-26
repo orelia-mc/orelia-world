@@ -6,6 +6,7 @@ import rpg.api.GuiApi;
 import rpg.api.JobApi;
 import rpg.api.SkillApi;
 import rpg.core.player.PlayerDataManager;
+import rpg.extra.api.AchievementApi;
 import rpg.gui.framework.Gui;
 import rpg.gui.framework.GuiButton;
 import rpg.gui.framework.GuiManager;
@@ -18,6 +19,11 @@ import rpg.util.ItemBuilder;
  * (ステータスはorelia-coreの{@code /ol status}画面をそのまま開く) instead of cramming every
  * section into one inventory. Every sub-screen carries a "戻る" button in its bottom-right
  * slot that reopens this menu.
+ *
+ * <p>実績 opens orelia-extra's real achievement GUI directly via {@link AchievementApi}
+ * (soft dependency - see {@code plugin.yml}) instead of relaying through the {@code /ol
+ * achievement gui} command. The icon is omitted entirely when {@code achievementApi} is
+ * {@code null} (OreliaExtra not installed), rather than showing a button that can't do anything.
  */
 public final class PlayerInfoGuiScreen {
 
@@ -25,19 +31,20 @@ public final class PlayerInfoGuiScreen {
 
     private final GuiManager guiManager;
     private final GuiApi guiApi;
+    private final AchievementApi achievementApi;
     private final PlayerInfoQuestGuiScreen questScreen;
     private final PlayerInfoJobGuiScreen jobScreen;
     private final PlayerInfoSkillGuiScreen skillScreen;
-    private final PlayerInfoAchievementGuiScreen achievementScreen;
 
     public PlayerInfoGuiScreen(QuestRepository questRepository, PlayerDataManager playerDataManager,
-                                JobApi jobApi, SkillApi skillApi, GuiApi guiApi, GuiManager guiManager) {
+                                JobApi jobApi, SkillApi skillApi, GuiApi guiApi, AchievementApi achievementApi,
+                                GuiManager guiManager) {
         this.guiManager = guiManager;
         this.guiApi = guiApi;
+        this.achievementApi = achievementApi;
         this.questScreen = new PlayerInfoQuestGuiScreen(questRepository, playerDataManager);
         this.jobScreen = new PlayerInfoJobGuiScreen(jobApi);
         this.skillScreen = new PlayerInfoSkillGuiScreen(guiApi, skillApi);
-        this.achievementScreen = new PlayerInfoAchievementGuiScreen();
     }
 
     public Gui build(Player player) {
@@ -50,8 +57,13 @@ public final class PlayerInfoGuiScreen {
                 (p, clickType) -> guiApi.openStatus(p)));
         gui.set(CATEGORY_SLOTS[3], new GuiButton(new ItemBuilder(Material.ENCHANTED_BOOK).name("&%bスキル").build(),
                 (p, clickType) -> guiManager.open(p, skillScreen.build(p, backButton(p)))));
-        gui.set(CATEGORY_SLOTS[4], new GuiButton(new ItemBuilder(Material.NETHER_STAR).name("&%b実績").build(),
-                (p, clickType) -> guiManager.open(p, achievementScreen.build(p, backButton(p)))));
+        if (achievementApi != null) {
+            gui.set(CATEGORY_SLOTS[4], new GuiButton(new ItemBuilder(Material.NETHER_STAR).name("&%b実績").build(),
+                    (p, clickType) -> {
+                        p.closeInventory();
+                        achievementApi.openGui(p);
+                    }));
+        }
         return gui;
     }
 
