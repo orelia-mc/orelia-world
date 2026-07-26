@@ -5,6 +5,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.ServicesManager;
 import rpg.api.GuiApi;
 import rpg.api.ItemApi;
+import rpg.api.RelicApi;
 import rpg.gui.framework.GuiManager;
 import rpg.npc.command.NpcAdminCommand;
 import rpg.npc.command.NpcSpawnCommand;
@@ -20,8 +21,8 @@ import rpg.world.core.module.WorldModule;
 
 /**
  * NPC module: config-driven NPC placement (npc.yml) and dispatching interactions to
- * orelia-core's shop/job-change/warehouse/enhancement screens (via {@link GuiApi}/
- * {@link ItemApi}) or orelia-world's own quest screen.
+ * orelia-core's shop/job-change/warehouse/enhancement/relic-upgrade screens (via
+ * {@link GuiApi}/{@link ItemApi}/{@link RelicApi}) or orelia-world's own quest screen.
  */
 public final class NpcModule implements WorldModule {
 
@@ -41,8 +42,9 @@ public final class NpcModule implements WorldModule {
 
         GuiApi guiApi = services.load(GuiApi.class);
         ItemApi itemApi = services.load(ItemApi.class);
-        if (guiApi == null || itemApi == null) {
-            throw new IllegalStateException("npc module requires OreliaCore's GuiApi and ItemApi");
+        RelicApi relicApi = services.load(RelicApi.class);
+        if (guiApi == null || itemApi == null || relicApi == null) {
+            throw new IllegalStateException("npc module requires OreliaCore's GuiApi, ItemApi and RelicApi");
         }
         Economy economy = services.load(Economy.class);
 
@@ -57,7 +59,7 @@ public final class NpcModule implements WorldModule {
 
         plugin.getServer().getPluginManager().registerEvents(new NpcInteractListener(
                 spawnService, guiApi, new GuiManager(), questModule.getQuestGuiScreen(), questModule.getProgressService(),
-                itemApi, economy, plugin.getMessageManager()), plugin);
+                itemApi, relicApi, economy, plugin.getMessageManager()), plugin);
 
         NpcAdminService adminService = new NpcAdminService(repository, spawnService, plugin.getConfigManager());
         plugin.getAdminCommandRegistry().register("npc", new NpcAdminCommand(adminService, syncService, plugin.getMessageManager()),
