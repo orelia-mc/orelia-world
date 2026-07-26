@@ -8,7 +8,7 @@
 # config-version tracks this file's schema. Bump it whenever a new top-level section is
 # added - on next startup, ConfigManager appends the new section (with its comments) to any
 # existing messages.yml that's missing it, without touching anything you've already customized.
-config-version: 3
+config-version: 4
 
 prefix: "&%8[&%6Orelia&%8] &r"
 
@@ -82,7 +82,8 @@ dungeon:
     already_in_dungeon: "&%c既にダンジョンに挑戦中です。"
     dungeon_full: "&%cこのダンジョンは現在満員です。しばらくしてから挑戦してください。"
     invalid_difficulty: "&%c選択できない難易度です（自キャラのレベル以下の難易度のみ選択できます）。"
-  cleared: "&%a&lダンジョンをクリアしました！"
+  cleared: "&%a&lダンジョンをクリアしました！ &%7報酬: &%fEXP +{exp} &%7/ &%f{money}G"
+  relic-reward: "&%bレリックを{count}個入手しました。"
   timed-out: "&%c制限時間切れです。ダンジョンから退出しました。"
   retired: "&%eダンジョンから離脱しました。"
   not-in-dungeon: "&%c現在ダンジョンに挑戦していません。"

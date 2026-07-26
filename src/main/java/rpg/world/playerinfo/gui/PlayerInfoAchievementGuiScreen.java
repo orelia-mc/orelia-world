@@ -8,13 +8,15 @@ import rpg.util.ItemBuilder;
 
 /**
  * Dedicated "実績" sub-screen of the player-info nether-star menu. Achievement tracking itself
- * lives in orelia-extra's {@code AchievementModule} (chat-based, paginated {@code /ol
- * achievement}) - orelia-world has no compile-time dependency on orelia-extra (only the reverse,
- * via {@code QuestApi}), so rather than reimplementing a GUI here, this screen is a launcher:
- * clicking the icon closes the GUI and runs {@code /ol achievement} for the player. If
- * OreliaExtra isn't installed, that command simply fails the normal "unknown command" way - no
- * direct linkage needed either direction. Opened from {@link PlayerInfoGuiScreen}, which
- * supplies the back button placed in this screen's bottom-right slot.
+ * lives in orelia-extra's {@code AchievementModule} (both a chat listing and a GUI, {@code /ol
+ * achievement [page]}/{@code /ol achievement gui}) - orelia-world has no compile-time dependency
+ * on orelia-extra (only the reverse, via {@code QuestApi}), so rather than reimplementing a
+ * screen here, this one is a launcher: clicking the icon closes this GUI and runs {@code /ol
+ * achievement gui} for the player, landing them on the same achievement GUI as if they'd typed
+ * that command themselves. If OreliaExtra isn't installed, that command simply fails the normal
+ * "unknown command" way - no direct linkage needed either direction. Opened from
+ * {@link PlayerInfoGuiScreen}, which supplies the back button placed in this screen's
+ * bottom-right slot.
  */
 public final class PlayerInfoAchievementGuiScreen {
 
@@ -27,10 +29,10 @@ public final class PlayerInfoAchievementGuiScreen {
         gui.set(BACK_SLOT, backButton);
         gui.set(LAUNCH_SLOT, new GuiButton(new ItemBuilder(Material.NETHER_STAR)
                 .name("&%b実績一覧を開く")
-                .lore("&%7クリックすると &%f/ol achievement &%7を実行します。", "&%8（要 OreliaExtra）")
+                .lore("&%7クリックすると &%f/ol achievement gui &%7を実行します。", "&%8（要 OreliaExtra）")
                 .build(), (p, clickType) -> {
             p.closeInventory();
-            p.performCommand("ol achievement");
+            p.performCommand("ol achievement gui");
         }));
         return gui;
     }
