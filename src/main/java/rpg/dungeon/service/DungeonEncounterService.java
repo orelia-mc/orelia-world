@@ -5,6 +5,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitTask;
 import rpg.api.CombatApi;
 import rpg.api.RelicApi;
 import rpg.api.StatusApi;
@@ -29,6 +30,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Drives a dungeon run's live encounter on top of {@link DungeonService}'s bare
@@ -128,11 +130,37 @@ public final class DungeonEncounterService {
         }
 
         DungeonInstance instance = instanceManager.getByPlayer(initiator.getUniqueId()).orElseThrow();
-        for (Player member : resolution.members()) {
-            messages.send(member, "dungeon.entry-countdown", "seconds", ENTRY_COUNTDOWN_TICKS / 20L);
-        }
-        schedulerService.runLater(() -> enterInstance(instance, difficulty), ENTRY_COUNTDOWN_TICKS);
+        startEntryCountdown(instance, difficulty);
         return Optional.empty();
+    }
+
+    /**
+     * Announces the entry countdown once per second (was a single "N秒後に挑戦します" message
+     * at the start, with nothing after it until the teleport) so players get a clear beat
+     * leading up to entry, then spawns the encounter once it reaches zero.
+     */
+    private void startEntryCountdown(DungeonInstance instance, Integer difficulty) {
+        long[] secondsRemaining = {ENTRY_COUNTDOWN_TICKS / 20L};
+        announceCountdown(instance, secondsRemaining[0]);
+        AtomicReference<BukkitTask> taskRef = new AtomicReference<>();
+        taskRef.set(schedulerService.runTimer(() -> {
+            secondsRemaining[0]--;
+            if (secondsRemaining[0] <= 0) {
+                taskRef.get().cancel();
+                enterInstance(instance, difficulty);
+                return;
+            }
+            announceCountdown(instance, secondsRemaining[0]);
+        }, 20L, 20L));
+    }
+
+    private void announceCountdown(DungeonInstance instance, long secondsRemaining) {
+        for (UUID memberId : instance.getMembers().keySet()) {
+            Player member = Bukkit.getPlayer(memberId);
+            if (member != null) {
+                messages.send(member, "dungeon.entry-countdown", "seconds", secondsRemaining);
+            }
+        }
     }
 
     /**
