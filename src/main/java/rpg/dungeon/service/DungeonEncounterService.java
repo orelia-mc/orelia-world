@@ -22,6 +22,7 @@ import rpg.dungeon.model.PlayerDungeonComponent;
 import rpg.dungeon.repository.PlayerDungeonRepository;
 import rpg.extra.api.PartyApi;
 import rpg.quest.service.QuestProgressService;
+import rpg.util.MoneyFormat;
 
 import java.util.List;
 import java.util.Map;
@@ -306,7 +307,7 @@ public final class DungeonEncounterService {
             memberIds.forEach(id -> questProgressService.onDungeonCleared(id, dungeonId));
             grantRelicDrops(instance, memberIds);
         }
-        notifyOutcome(memberIds, reason);
+        notifyOutcome(instance, memberIds, reason);
     }
 
     /** Only bossed dungeons drop relics - see {@code rpg.api.RelicApi#generateRelic}, dungeons.yml's boss-id. */
@@ -324,10 +325,18 @@ public final class DungeonEncounterService {
                 continue;
             }
             int count = min + random.nextInt(max - min + 1);
+            int granted = 0;
             for (int i = 0; i < count; i++) {
-                relicApi.generateRelic(dungeonId).ifPresent(relic ->
-                        member.getInventory().addItem(relic).values()
-                                .forEach(leftover -> member.getWorld().dropItemNaturally(member.getLocation(), leftover)));
+                if (relicApi.generateRelic(dungeonId).map(relic -> {
+                    member.getInventory().addItem(relic).values()
+                            .forEach(leftover -> member.getWorld().dropItemNaturally(member.getLocation(), leftover));
+                    return true;
+                }).orElse(false)) {
+                    granted++;
+                }
+            }
+            if (granted > 0) {
+                messages.send(member, "dungeon.relic-reward", "count", granted);
             }
         }
     }
@@ -341,7 +350,7 @@ public final class DungeonEncounterService {
         }
     }
 
-    private void notifyOutcome(Set<UUID> memberIds, DungeonEndReason reason) {
+    private void notifyOutcome(DungeonInstance instance, Set<UUID> memberIds, DungeonEndReason reason) {
         String key = switch (reason) {
             case CLEARED -> "dungeon.cleared";
             case TIMED_OUT -> "dungeon.timed-out";
@@ -349,7 +358,16 @@ public final class DungeonEncounterService {
         };
         for (UUID memberId : memberIds) {
             Player member = Bukkit.getPlayer(memberId);
-            if (member != null) {
+            if (member == null) {
+                continue;
+            }
+            if (reason == DungeonEndReason.CLEARED) {
+                // Reward amounts weren't shown anywhere before - clearing silently granted EXP/
+                // money with only a generic "cleared!" message, and grantRelicDrops (above)
+                // reports its own count separately since it varies per member.
+                messages.send(member, key, "exp", instance.getData().getRewardExp(),
+                        "money", MoneyFormat.format(instance.getData().getRewardMoney()));
+            } else {
                 messages.send(member, key);
             }
         }
