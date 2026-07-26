@@ -10,6 +10,7 @@ import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.inventory.ItemStack;
 import rpg.api.GuiApi;
 import rpg.api.ItemApi;
+import rpg.api.RelicApi;
 import rpg.core.message.MessageManager;
 import rpg.gui.framework.GuiManager;
 import rpg.npc.event.NpcGuildInteractEvent;
@@ -34,18 +35,20 @@ public final class NpcInteractListener implements Listener {
     private final QuestGuiScreen questGuiScreen;
     private final QuestProgressService questProgressService;
     private final ItemApi itemApi;
+    private final RelicApi relicApi;
     private final Economy economy;
     private final MessageManager messages;
 
     public NpcInteractListener(NpcSpawnService spawnService, GuiApi guiApi, GuiManager guiManager,
                                 QuestGuiScreen questGuiScreen, QuestProgressService questProgressService,
-                                ItemApi itemApi, Economy economy, MessageManager messages) {
+                                ItemApi itemApi, RelicApi relicApi, Economy economy, MessageManager messages) {
         this.spawnService = spawnService;
         this.guiApi = guiApi;
         this.guiManager = guiManager;
         this.questGuiScreen = questGuiScreen;
         this.questProgressService = questProgressService;
         this.itemApi = itemApi;
+        this.relicApi = relicApi;
         this.economy = economy;
         this.messages = messages;
     }
@@ -69,6 +72,7 @@ public final class NpcInteractListener implements Listener {
             case WAREHOUSE -> guiApi.openWarehouse(player);
             case ENHANCEMENT -> enhance(player, data);
             case WEAPON_LEVELUP -> levelUpWeapon(player, data);
+            case RELIC_UPGRADE -> relicApi.openUpgradeGui(player);
             // orelia-world can't compile-depend on orelia-extra (guild lives there), so this
             // just fires a hook event - a harmless no-op unless orelia-extra is installed and
             // listening (see rpg.extra.guild.listener.NpcGuildInteractListener).

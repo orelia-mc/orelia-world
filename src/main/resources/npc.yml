@@ -1,7 +1,11 @@
 # NPC definitions (SOW section 12).
 # type: WEAPON_SHOP | ARMOR_SHOP | ACCESSORY_SHOP | QUEST_RECEPTIONIST | JOB_CHANGE |
-#       ENHANCEMENT | WAREHOUSE | GUILD_RECEPTIONIST | WEAPON_LEVELUP
-# shop-stock kind: WEAPON | ACCESSORY | VANILLA
+#       ENHANCEMENT | WAREHOUSE | GUILD_RECEPTIONIST | WEAPON_LEVELUP | RELIC_UPGRADE
+# shop-stock kind: WEAPON | ACCESSORY | RELIC | VANILLA
+#   RELIC id must match a key under orelia-core's relics.yml shop-relics: section (fixed,
+#   already-max-level relics - distinct from the rollable ones a dungeon boss drops).
+# RELIC_UPGRADE needs no extra fields - it just opens the "選べる厳選" substat-upgrade GUI
+# (rpg.api.RelicApi#openUpgradeGui) for whatever relic the player is holding, same as /ol relic upgrade.
 # weapon-levelup-item-material: a vanilla Material name consumed (with weapon-levelup-item-amount)
 # alongside weapon-levelup-cost-base + weapon-levelup-cost-per-level * currentLevel money.
 config-version: 1
@@ -63,16 +67,32 @@ npcs:
     z: 10
     yaw: 180
     dialogue:
-      - "珍しいアクセサリーを取り揃えています。"
+      - "厳選済みのレリックを取り揃えています。"
     shop-stock:
       item_1:
-        kind: ACCESSORY
-        id: guardian_charm
-        price: 200
+        kind: RELIC
+        id: shop_guardian_charm
+        price: 400
       item_2:
-        kind: ACCESSORY
-        id: warriors_ring
-        price: 250
+        kind: RELIC
+        id: shop_warriors_ring
+        price: 450
+      item_3:
+        kind: RELIC
+        id: shop_sages_necklace
+        price: 450
+
+  relic_upgrader:
+    name: "厳選師オルギン"
+    type: RELIC_UPGRADE
+    entity-type: WANDERING_TRADER
+    world: world
+    x: 18
+    y: 64
+    z: 10
+    yaw: 180
+    dialogue:
+      - "レリックを持ってきな、望むステータスに育ててやろう。"
 
   quest_receptionist:
     name: "クエスト受付ノーラ"
