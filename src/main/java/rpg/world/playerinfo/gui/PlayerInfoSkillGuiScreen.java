@@ -16,7 +16,9 @@ import java.util.List;
  * {@link PlayerInfoGuiScreen}, which supplies the back button placed in this screen's
  * bottom-right slot. Every button here hands off to orelia-core's own weapon-skill screen
  * ({@link GuiApi#openSkill(Player)}) - the actual learn/level-up/socket actions live there,
- * scoped to whichever weapon the player is currently holding.
+ * scoped to whichever weapon sits in the player's leftmost hotbar slot (not main hand -
+ * opening this menu requires holding the Nether Star itself, so orelia-core's screen reads
+ * a fixed hotbar slot instead of main hand; see its own class doc for details).
  */
 public final class PlayerInfoSkillGuiScreen {
 
