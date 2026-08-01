@@ -5,9 +5,11 @@ import org.bukkit.entity.Player;
 import rpg.core.config.ConfigFile;
 import rpg.core.config.ConfigManager;
 import rpg.core.player.PlayerDataManager;
+import rpg.dungeon.gui.DungeonGuiScreen;
 import rpg.dungeon.model.PlayerDungeonComponent;
 import rpg.dungeon.repository.DungeonRepository;
 import rpg.dungeon.service.DungeonEncounterService;
+import rpg.gui.framework.GuiManager;
 import rpg.npc.repository.NpcRepository;
 import rpg.quest.service.QuestProgressService;
 
@@ -23,16 +25,19 @@ final class WorldDebugApiImpl implements WorldDebugApi {
     private final NpcRepository npcRepository;
     private final DungeonRepository dungeonRepository;
     private final DungeonEncounterService dungeonEncounterService;
+    private final DungeonGuiScreen dungeonGuiScreen;
     private final PlayerDataManager playerDataManager;
+    private final GuiManager guiManager = new GuiManager();
 
     WorldDebugApiImpl(ConfigManager configManager, QuestProgressService questProgressService, NpcRepository npcRepository,
                        DungeonRepository dungeonRepository, DungeonEncounterService dungeonEncounterService,
-                       PlayerDataManager playerDataManager) {
+                       DungeonGuiScreen dungeonGuiScreen, PlayerDataManager playerDataManager) {
         this.configManager = configManager;
         this.questProgressService = questProgressService;
         this.npcRepository = npcRepository;
         this.dungeonRepository = dungeonRepository;
         this.dungeonEncounterService = dungeonEncounterService;
+        this.dungeonGuiScreen = dungeonGuiScreen;
         this.playerDataManager = playerDataManager;
     }
 
@@ -152,6 +157,11 @@ final class WorldDebugApiImpl implements WorldDebugApi {
     @Override
     public Optional<String> getActiveDungeonId(UUID playerId) {
         return dungeonEncounterService.getActiveDungeonId(playerId);
+    }
+
+    @Override
+    public void openDungeon(Player player) {
+        guiManager.open(player, dungeonGuiScreen.build(player));
     }
 
     private ConfigFile tryGet(String fileName) {
