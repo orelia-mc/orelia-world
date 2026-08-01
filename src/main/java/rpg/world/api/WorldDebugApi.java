@@ -1,5 +1,7 @@
 package rpg.world.api;
 
+import org.bukkit.entity.Player;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -65,4 +67,7 @@ public interface WorldDebugApi {
 
     /** The dungeon id of the run {@code playerId} is currently in, if any. */
     Optional<String> getActiveDungeonId(UUID playerId);
+
+    /** Force-opens the dungeon list screen (same as {@code DungeonGuiScreen}) for {@code player}. */
+    void openDungeon(Player player);
 }
