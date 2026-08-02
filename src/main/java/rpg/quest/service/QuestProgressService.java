@@ -1,5 +1,6 @@
 package rpg.quest.service;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import rpg.core.message.MessageManager;
@@ -30,16 +31,28 @@ public final class QuestProgressService {
     private final QuestRewardService rewardService;
     private final QuestItemInventoryService inventoryService;
     private final MessageManager messages;
+    private final QuestObjectiveFeedbackService feedbackService;
 
     public QuestProgressService(PlayerDataManager playerDataManager, QuestRepository questRepository,
                                  QuestEligibilityService eligibilityService, QuestRewardService rewardService,
-                                 QuestItemInventoryService inventoryService, MessageManager messages) {
+                                 QuestItemInventoryService inventoryService, MessageManager messages,
+                                 QuestObjectiveFeedbackService feedbackService) {
         this.playerDataManager = playerDataManager;
         this.questRepository = questRepository;
         this.eligibilityService = eligibilityService;
         this.rewardService = rewardService;
         this.inventoryService = inventoryService;
         this.messages = messages;
+        this.feedbackService = feedbackService;
+    }
+
+    /**
+     * Drops an in-progress quest without rewards. Shared by {@link rpg.quest.command.QuestCommand}
+     * and {@link rpg.quest.gui.QuestGuiScreen} so both expose the same behavior instead of the
+     * GUI reimplementing the removal itself.
+     */
+    public boolean abandon(UUID playerId, String questId) {
+        return component(playerId).map(c -> c.getActiveQuests().remove(questId) != null).orElse(false);
     }
 
     public Optional<QuestEligibilityService.Ineligibility> accept(Player player, String questId) {
@@ -161,18 +174,19 @@ public final class QuestProgressService {
      */
     private void forEachInProgressQuest(UUID playerId, BiConsumer<QuestData, PlayerQuestProgress> action) {
         component(playerId).ifPresent(component -> {
+            Player player = Bukkit.getPlayer(playerId);
             for (var entry : component.getActiveQuests().entrySet()) {
                 QuestData quest = questRepository.findById(entry.getKey()).orElse(null);
                 if (quest == null || entry.getValue().getState() != QuestState.IN_PROGRESS) {
                     continue;
                 }
                 action.accept(quest, entry.getValue());
-                evaluateCompletion(quest, entry.getValue());
+                evaluateCompletion(player, quest, entry.getValue());
             }
         });
     }
 
-    private void evaluateCompletion(QuestData quest, PlayerQuestProgress progress) {
+    private void evaluateCompletion(Player player, QuestData quest, PlayerQuestProgress progress) {
         List<QuestObjective> objectives = quest.getObjectives();
         for (int i = 0; i < objectives.size(); i++) {
             if (progress.getProgress(i) < objectives.get(i).getRequiredAmount()) {
@@ -180,6 +194,9 @@ public final class QuestProgressService {
             }
         }
         progress.setState(QuestState.AWAITING_REPORT);
+        if (player != null) {
+            feedbackService.notifyObjectivesComplete(player, quest);
+        }
     }
 
     /**
@@ -201,7 +218,7 @@ public final class QuestProgressService {
         for (int i = 0; i < objectives.size(); i++) {
             progress.setProgress(i, objectives.get(i).getRequiredAmount());
         }
-        evaluateCompletion(quest, progress);
+        evaluateCompletion(Bukkit.getPlayer(playerId), quest, progress);
         return true;
     }
 

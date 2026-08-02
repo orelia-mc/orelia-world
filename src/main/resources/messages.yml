@@ -8,7 +8,7 @@
 # config-version tracks this file's schema. Bump it whenever a new top-level section is
 # added - on next startup, ConfigManager appends the new section (with its comments) to any
 # existing messages.yml that's missing it, without touching anything you've already customized.
-config-version: 4
+config-version: 5
 
 prefix: "&%8[&%6Orelia&%8] &r"
 
@@ -30,6 +30,9 @@ quest:
   completed: "&%aクエストを完了しました！"
   report-failed: "&%c報告に失敗しました。"
   in-progress: "&%eこのクエストは進行中です。"
+  objective-complete-title: "&%e目標達成！"
+  objective-complete-subtitle: "&%a{quest}"
+  objective-complete-actionbar: "&%aクエスト「{quest}」の目標を達成しました。NPCに報告しましょう。"
 
 title:
   usage: "&%e使い方: /title &%7<&%elist&%7|&%eequip &%7<&%etitle&%7>&%e&%7|&%eunequip&%7>&%e"
