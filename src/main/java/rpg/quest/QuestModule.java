@@ -10,8 +10,10 @@ import rpg.api.SkillApi;
 import rpg.api.StatusApi;
 import rpg.core.command.CommandAliasUtil;
 import rpg.database.manager.DatabaseManager;
+import rpg.extra.api.PartyApi;
 import rpg.quest.command.QuestCommand;
 import rpg.quest.command.TitleCommand;
+import rpg.quest.config.QuestFeedbackConfig;
 import rpg.quest.gui.QuestGuiScreen;
 import rpg.quest.listener.QuestKillListener;
 import rpg.quest.manager.QuestManager;
@@ -19,6 +21,7 @@ import rpg.quest.repository.PlayerQuestRepository;
 import rpg.quest.repository.QuestRepository;
 import rpg.quest.service.QuestEligibilityService;
 import rpg.quest.service.QuestItemInventoryService;
+import rpg.quest.service.QuestObjectiveFeedbackService;
 import rpg.quest.service.QuestProgressService;
 import rpg.quest.service.QuestRewardService;
 import rpg.world.core.OreliaWorldPlugin;
@@ -34,6 +37,7 @@ import java.util.logging.Level;
 public final class QuestModule implements WorldModule {
 
     private final QuestRepository questRepository = new QuestRepository();
+    private final QuestFeedbackConfig feedbackConfig = new QuestFeedbackConfig();
     private QuestProgressService progressService;
     private QuestGuiScreen questGuiScreen;
     private OreliaWorldPlugin plugin;
@@ -55,8 +59,12 @@ public final class QuestModule implements WorldModule {
         SkillApi skillApi = require(services, SkillApi.class);
         CombatApi combatApi = require(services, CombatApi.class);
         Economy economy = services.load(Economy.class);
+        // Soft dependency - orelia-extra (and therefore PartyApi) may not be installed.
+        // party-only quests fail closed when null (see QuestEligibilityService).
+        PartyApi partyApi = services.load(PartyApi.class);
 
         reloadQuests();
+        reloadFeedbackConfig();
 
         PlayerQuestRepository repository = new PlayerQuestRepository(databaseManager);
         try {
@@ -67,18 +75,19 @@ public final class QuestModule implements WorldModule {
         QuestManager questManager = new QuestManager(repository);
         plugin.getPlayerDataManager().registerLoader(questManager);
 
-        QuestEligibilityService eligibilityService = new QuestEligibilityService(plugin.getPlayerDataManager(), statusApi);
+        QuestEligibilityService eligibilityService = new QuestEligibilityService(plugin.getPlayerDataManager(), statusApi, partyApi);
         QuestItemInventoryService inventoryService = new QuestItemInventoryService(itemApi);
         QuestRewardService rewardService = new QuestRewardService(
                 plugin.getPlayerDataManager(), statusApi, economy, itemApi, accessoryApi, skillApi);
+        QuestObjectiveFeedbackService feedbackService = new QuestObjectiveFeedbackService(plugin.getMessageManager(), feedbackConfig);
         this.progressService = new QuestProgressService(plugin.getPlayerDataManager(), questRepository, eligibilityService,
-                rewardService, inventoryService, plugin.getMessageManager());
+                rewardService, inventoryService, plugin.getMessageManager(), feedbackService);
         this.questGuiScreen = new QuestGuiScreen(questRepository, progressService, eligibilityService,
                 plugin.getPlayerDataManager(), plugin.getMessageManager());
 
         plugin.getServer().getPluginManager().registerEvents(new QuestKillListener(combatApi, progressService), plugin);
 
-        QuestCommand questCommand = new QuestCommand(plugin.getPlayerDataManager(), questRepository, plugin.getMessageManager());
+        QuestCommand questCommand = new QuestCommand(plugin.getPlayerDataManager(), questRepository, progressService, plugin.getMessageManager());
         plugin.getPlayerCommandRegistry().register("quest", questCommand,
                 "クエストの受注状況を確認します。", "quest <list|abandon <id>>");
         CommandAliasUtil.registerAlias(plugin, "quest", questCommand,
@@ -102,12 +111,18 @@ public final class QuestModule implements WorldModule {
     @Override
     public void onReload() {
         reloadQuests();
+        reloadFeedbackConfig();
     }
 
     private void reloadQuests() {
         plugin.getConfigManager().register("quests.yml");
         YamlConfiguration config = plugin.getConfigManager().get("quests.yml").get();
         questRepository.load(config);
+    }
+
+    private void reloadFeedbackConfig() {
+        plugin.getConfigManager().register("config.yml");
+        feedbackConfig.load(plugin.getConfigManager().get("config.yml").get());
     }
 
     private <T> T require(ServicesManager services, Class<T> type) {

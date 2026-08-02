@@ -1,11 +1,15 @@
 # Orelia World configuration.
 # Reload with: /oladmin worldreload
-config-version: 3
+config-version: 4
 
 quest:
   # How often (in ticks) each online player's COLLECT_ITEM / DELIVER_ITEM / REACH_LOCATION
   # objectives are re-checked. 40 ticks = 2 seconds.
   objective-check-period-ticks: 40
+  completion-feedback:
+    # Title + action-bar shown when a quest's objectives are all met. Disable if it doesn't
+    # suit your server's pacing - the quest still transitions to AWAITING_REPORT either way.
+    enabled: true
 
 dungeon:
   # Relics (rpg.api.RelicApi#generateRelic) granted to each member when a bossed dungeon is

@@ -62,13 +62,20 @@ public final class QuestGuiScreen {
             gui.set(slot++, new GuiButton(new ItemBuilder(Material.WRITABLE_BOOK)
                     .name("&%e" + quest.getName())
                     .lore(quest.getDescription())
-                    .build(), (clicker, clickType) -> handleClick(clicker, quest, state)));
+                    .build(), (clicker, clickType) -> handleClick(clicker, quest, state, clickType)));
         }
         return gui;
     }
 
-    private void handleClick(Player player, QuestData quest, QuestState state) {
+    /** Shift-click abandons an in-progress (or awaiting-report) quest; a plain click accepts/reports as before. */
+    private void handleClick(Player player, QuestData quest, QuestState state, String clickType) {
         String questId = quest.getId();
+        if (clickType != null && clickType.startsWith("SHIFT_")
+                && (state == QuestState.IN_PROGRESS || state == QuestState.AWAITING_REPORT)) {
+            boolean abandoned = progressService.abandon(player.getUniqueId(), questId);
+            messages.send(player, abandoned ? "quest.abandoned" : "quest.not-active", "quest", questId);
+            return;
+        }
         if (state == QuestState.AWAITING_REPORT) {
             boolean reported = progressService.report(player, questId);
             messages.send(player, reported ? "quest.completed" : "quest.report-failed");

@@ -13,6 +13,7 @@ import rpg.quest.model.PlayerQuestProgress;
 import rpg.quest.model.QuestData;
 import rpg.quest.model.QuestObjective;
 import rpg.quest.repository.QuestRepository;
+import rpg.quest.service.QuestProgressService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,12 +29,15 @@ public final class QuestCommand implements CommandExecutor, TabCompleter {
 
     private final PlayerDataManager playerDataManager;
     private final QuestRepository questRepository;
+    private final QuestProgressService progressService;
     private final MessageManager messages;
     private final QuestObjectiveBarRenderer barRenderer = new QuestObjectiveBarRenderer();
 
-    public QuestCommand(PlayerDataManager playerDataManager, QuestRepository questRepository, MessageManager messages) {
+    public QuestCommand(PlayerDataManager playerDataManager, QuestRepository questRepository,
+                         QuestProgressService progressService, MessageManager messages) {
         this.playerDataManager = playerDataManager;
         this.questRepository = questRepository;
+        this.progressService = progressService;
         this.messages = messages;
     }
 
@@ -53,7 +57,7 @@ public final class QuestCommand implements CommandExecutor, TabCompleter {
 
         if (args.length >= 2 && args[0].equalsIgnoreCase("abandon")) {
             String questId = args[1];
-            if (component.getActiveQuests().remove(questId) != null) {
+            if (progressService.abandon(player.getUniqueId(), questId)) {
                 messages.send(sender, "quest.abandoned", "quest", questId);
             } else {
                 messages.send(sender, "quest.not-active");
