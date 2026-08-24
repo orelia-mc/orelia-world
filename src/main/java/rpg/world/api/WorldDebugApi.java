@@ -70,4 +70,10 @@ public interface WorldDebugApi {
 
     /** Force-opens the dungeon list screen (same as {@code DungeonGuiScreen}) for {@code player}. */
     void openDungeon(Player player);
+
+    /**
+     * Force-opens {@code player}'s full quest log (same as {@code QuestGuiScreen#build(Player)})
+     * - not tied to any specific NPC's offer list, unlike the in-game NPC interaction path.
+     */
+    void openQuest(Player player);
 }
