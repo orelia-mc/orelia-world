@@ -12,6 +12,7 @@ import rpg.dungeon.repository.DungeonRepository;
 import rpg.dungeon.service.DungeonEncounterService;
 import rpg.gui.framework.GuiManager;
 import rpg.npc.repository.NpcRepository;
+import rpg.quest.gui.QuestGuiScreen;
 import rpg.quest.service.QuestProgressService;
 
 import java.util.ArrayList;
@@ -24,6 +25,7 @@ final class WorldDebugApiImpl implements WorldDebugApi {
 
     private final ConfigManager configManager;
     private final QuestProgressService questProgressService;
+    private final QuestGuiScreen questGuiScreen;
     private final NpcRepository npcRepository;
     private final DungeonRepository dungeonRepository;
     private final DungeonEncounterService dungeonEncounterService;
@@ -31,11 +33,12 @@ final class WorldDebugApiImpl implements WorldDebugApi {
     private final PlayerDataManager playerDataManager;
     private final GuiManager guiManager = new GuiManager();
 
-    WorldDebugApiImpl(ConfigManager configManager, QuestProgressService questProgressService, NpcRepository npcRepository,
-                       DungeonRepository dungeonRepository, DungeonEncounterService dungeonEncounterService,
+    WorldDebugApiImpl(ConfigManager configManager, QuestProgressService questProgressService, QuestGuiScreen questGuiScreen,
+                       NpcRepository npcRepository, DungeonRepository dungeonRepository, DungeonEncounterService dungeonEncounterService,
                        DungeonGuiScreen dungeonGuiScreen, PlayerDataManager playerDataManager) {
         this.configManager = configManager;
         this.questProgressService = questProgressService;
+        this.questGuiScreen = questGuiScreen;
         this.npcRepository = npcRepository;
         this.dungeonRepository = dungeonRepository;
         this.dungeonEncounterService = dungeonEncounterService;
@@ -187,6 +190,11 @@ final class WorldDebugApiImpl implements WorldDebugApi {
     @Override
     public void openDungeon(Player player) {
         guiManager.open(player, dungeonGuiScreen.build(player));
+    }
+
+    @Override
+    public void openQuest(Player player) {
+        guiManager.open(player, questGuiScreen.build(player));
     }
 
     private ConfigFile tryGet(String fileName) {

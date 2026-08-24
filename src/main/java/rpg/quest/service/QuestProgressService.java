@@ -1,5 +1,7 @@
 package rpg.quest.service;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.HoverEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -12,6 +14,7 @@ import rpg.quest.model.QuestData;
 import rpg.quest.model.QuestObjective;
 import rpg.quest.model.QuestState;
 import rpg.quest.repository.QuestRepository;
+import rpg.util.ColorUtil;
 
 import java.util.List;
 import java.util.Optional;
@@ -99,9 +102,29 @@ public final class QuestProgressService {
         for (QuestData candidate : questRepository.getAll().values()) {
             if (candidate.getPrerequisiteQuestIds().contains(completedQuestId)
                     && eligibilityService.checkEligibility(player, candidate).isEmpty()) {
-                messages.send(player, "quest.newly-unlocked", "quest", candidate.getName());
+                player.sendMessage(newlyUnlockedComponent(candidate));
             }
         }
+    }
+
+    /**
+     * Builds {@code quest.newly-unlocked} as a Component with the quest name itself clickable
+     * (runs {@code /ol quest gui}, same "one manually-spliced rich slot" pattern orelia-extra's
+     * {@code PlayerNameHover}/{@code TradeCommand#offerEntryComponent} use) instead of going
+     * through the string-only {@link MessageManager#send} - {@link MessageManager} itself is
+     * untouched, same as those.
+     */
+    private Component newlyUnlockedComponent(QuestData quest) {
+        String template = messages.getPrefix() + messages.format("quest.newly-unlocked", "quest", quest.getName());
+        int start = template.indexOf(quest.getName());
+        if (start < 0) {
+            return ColorUtil.component(template);
+        }
+        String before = template.substring(0, start);
+        String after = template.substring(start + quest.getName().length());
+        Component questName = ColorUtil.componentWithCommand("&%a&n" + quest.getName(), "/ol quest gui")
+                .hoverEvent(HoverEvent.showText(ColorUtil.component("&%7クリックしてクエストログを開く")));
+        return ColorUtil.component(before).append(questName).append(ColorUtil.component(after));
     }
 
     /**
