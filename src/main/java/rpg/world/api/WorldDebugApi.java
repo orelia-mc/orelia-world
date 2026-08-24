@@ -25,6 +25,17 @@ public interface WorldDebugApi {
 
     List<String> describeConfigKeys(String fileName);
 
+    /**
+     * One node per key in {@code fileName}, in on-disk order, depth-first - for a human-readable
+     * indented "config view" listing rather than a flat dot-path dump. Same shape as
+     * orelia-core's {@code rpg.api.DebugApi.ConfigTreeEntry}, duplicated here rather than shared
+     * since orelia-world doesn't otherwise depend on orelia-core's {@code rpg.api} package.
+     */
+    List<ConfigTreeEntry> listConfigTree(String fileName);
+
+    /** See {@link #listConfigTree}. {@code value} is {@code null} for a non-leaf (section) node. */
+    record ConfigTreeEntry(String path, int depth, String label, String value, boolean isLeaf) {}
+
     /** Forces every objective of {@code questId} to completion for {@code playerId}, if in progress. */
     boolean forceCompleteQuestObjectives(UUID playerId, String questId);
 
@@ -109,4 +120,10 @@ public interface WorldDebugApi {
 
     /** Force-opens the dungeon list screen (same as {@code DungeonGuiScreen}) for {@code player}. */
     void openDungeon(Player player);
+
+    /**
+     * Force-opens {@code player}'s full quest log (same as {@code QuestGuiScreen#build(Player)})
+     * - not tied to any specific NPC's offer list, unlike the in-game NPC interaction path.
+     */
+    void openQuest(Player player);
 }

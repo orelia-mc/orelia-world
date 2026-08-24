@@ -1,6 +1,7 @@
 package rpg.world.api;
 
 import org.bukkit.Bukkit;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import rpg.core.config.ConfigFile;
 import rpg.core.config.ConfigManager;
@@ -11,6 +12,7 @@ import rpg.dungeon.repository.DungeonRepository;
 import rpg.dungeon.service.DungeonEncounterService;
 import rpg.gui.framework.GuiManager;
 import rpg.npc.repository.NpcRepository;
+import rpg.quest.gui.QuestGuiScreen;
 import rpg.quest.model.PlayerQuestComponent;
 import rpg.quest.model.PlayerQuestProgress;
 import rpg.quest.model.QuestData;
@@ -29,6 +31,7 @@ final class WorldDebugApiImpl implements WorldDebugApi {
 
     private final ConfigManager configManager;
     private final QuestProgressService questProgressService;
+    private final QuestGuiScreen questGuiScreen;
     private final QuestRepository questRepository;
     private final NpcRepository npcRepository;
     private final DungeonRepository dungeonRepository;
@@ -37,11 +40,13 @@ final class WorldDebugApiImpl implements WorldDebugApi {
     private final PlayerDataManager playerDataManager;
     private final GuiManager guiManager = new GuiManager();
 
-    WorldDebugApiImpl(ConfigManager configManager, QuestProgressService questProgressService, QuestRepository questRepository,
-                       NpcRepository npcRepository, DungeonRepository dungeonRepository, DungeonEncounterService dungeonEncounterService,
-                       DungeonGuiScreen dungeonGuiScreen, PlayerDataManager playerDataManager) {
+    WorldDebugApiImpl(ConfigManager configManager, QuestProgressService questProgressService, QuestGuiScreen questGuiScreen,
+                       QuestRepository questRepository, NpcRepository npcRepository, DungeonRepository dungeonRepository,
+                       DungeonEncounterService dungeonEncounterService, DungeonGuiScreen dungeonGuiScreen,
+                       PlayerDataManager playerDataManager) {
         this.configManager = configManager;
         this.questProgressService = questProgressService;
+        this.questGuiScreen = questGuiScreen;
         this.questRepository = questRepository;
         this.npcRepository = npcRepository;
         this.dungeonRepository = dungeonRepository;
@@ -90,6 +95,29 @@ final class WorldDebugApiImpl implements WorldDebugApi {
             return List.of();
         }
         return file.get().getKeys(true).stream().sorted().toList();
+    }
+
+    @Override
+    public List<ConfigTreeEntry> listConfigTree(String fileName) {
+        ConfigFile file = tryGet(fileName);
+        if (file == null) {
+            return List.of();
+        }
+        List<ConfigTreeEntry> entries = new ArrayList<>();
+        collectTree(file.get(), "", 0, entries);
+        return entries;
+    }
+
+    private void collectTree(ConfigurationSection section, String pathPrefix, int depth, List<ConfigTreeEntry> out) {
+        for (String key : section.getKeys(false)) {
+            String path = pathPrefix.isEmpty() ? key : pathPrefix + "." + key;
+            if (section.isConfigurationSection(key)) {
+                out.add(new ConfigTreeEntry(path, depth, key, null, false));
+                collectTree(section.getConfigurationSection(key), path, depth + 1, out);
+            } else {
+                out.add(new ConfigTreeEntry(path, depth, key, String.valueOf(section.get(key)), true));
+            }
+        }
     }
 
     @Override
@@ -235,6 +263,11 @@ final class WorldDebugApiImpl implements WorldDebugApi {
     @Override
     public void openDungeon(Player player) {
         guiManager.open(player, dungeonGuiScreen.build(player));
+    }
+
+    @Override
+    public void openQuest(Player player) {
+        guiManager.open(player, questGuiScreen.build(player));
     }
 
     private ConfigFile tryGet(String fileName) {
