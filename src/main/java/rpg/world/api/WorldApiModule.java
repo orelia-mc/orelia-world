@@ -32,9 +32,9 @@ public final class WorldApiModule implements WorldModule {
                 QuestApi.class, new QuestApiImpl(plugin.getPlayerDataManager()), plugin, ServicePriority.Normal);
         plugin.getServer().getServicesManager().register(
                 WorldDebugApi.class,
-                new WorldDebugApiImpl(plugin.getConfigManager(), questModule.getProgressService(), npcModule.getRepository(),
-                        dungeonModule.getRepository(), dungeonModule.getEncounterService(), dungeonModule.getGuiScreen(),
-                        plugin.getPlayerDataManager()),
+                new WorldDebugApiImpl(plugin.getConfigManager(), questModule.getProgressService(), questModule.getQuestRepository(),
+                        npcModule.getRepository(), dungeonModule.getRepository(), dungeonModule.getEncounterService(),
+                        dungeonModule.getGuiScreen(), plugin.getPlayerDataManager()),
                 plugin, ServicePriority.Normal);
     }
 
