@@ -13,6 +13,12 @@ import rpg.dungeon.service.DungeonEncounterService;
 import rpg.gui.framework.GuiManager;
 import rpg.npc.repository.NpcRepository;
 import rpg.quest.gui.QuestGuiScreen;
+import rpg.quest.model.PlayerQuestComponent;
+import rpg.quest.model.PlayerQuestProgress;
+import rpg.quest.model.QuestData;
+import rpg.quest.model.QuestObjective;
+import rpg.quest.model.QuestReward;
+import rpg.quest.repository.QuestRepository;
 import rpg.quest.service.QuestProgressService;
 
 import java.util.ArrayList;
@@ -26,6 +32,7 @@ final class WorldDebugApiImpl implements WorldDebugApi {
     private final ConfigManager configManager;
     private final QuestProgressService questProgressService;
     private final QuestGuiScreen questGuiScreen;
+    private final QuestRepository questRepository;
     private final NpcRepository npcRepository;
     private final DungeonRepository dungeonRepository;
     private final DungeonEncounterService dungeonEncounterService;
@@ -34,11 +41,13 @@ final class WorldDebugApiImpl implements WorldDebugApi {
     private final GuiManager guiManager = new GuiManager();
 
     WorldDebugApiImpl(ConfigManager configManager, QuestProgressService questProgressService, QuestGuiScreen questGuiScreen,
-                       NpcRepository npcRepository, DungeonRepository dungeonRepository, DungeonEncounterService dungeonEncounterService,
-                       DungeonGuiScreen dungeonGuiScreen, PlayerDataManager playerDataManager) {
+                       QuestRepository questRepository, NpcRepository npcRepository, DungeonRepository dungeonRepository,
+                       DungeonEncounterService dungeonEncounterService, DungeonGuiScreen dungeonGuiScreen,
+                       PlayerDataManager playerDataManager) {
         this.configManager = configManager;
         this.questProgressService = questProgressService;
         this.questGuiScreen = questGuiScreen;
+        this.questRepository = questRepository;
         this.npcRepository = npcRepository;
         this.dungeonRepository = dungeonRepository;
         this.dungeonEncounterService = dungeonEncounterService;
@@ -129,6 +138,70 @@ final class WorldDebugApiImpl implements WorldDebugApi {
     @Override
     public List<String> listQuestIds() {
         return questProgressService.listQuestIds().stream().sorted().toList();
+    }
+
+    @Override
+    public List<QuestDefinition> listQuestDefinitions() {
+        return questRepository.getAll().values().stream().map(this::toDefinition).toList();
+    }
+
+    @Override
+    public Optional<QuestDefinition> getQuestDefinition(String questId) {
+        return questRepository.findById(questId).map(this::toDefinition);
+    }
+
+    private QuestDefinition toDefinition(QuestData quest) {
+        List<QuestObjectiveInfo> objectives = quest.getObjectives().stream()
+                .map(this::toObjectiveInfo).toList();
+        return new QuestDefinition(quest.getId(), quest.getName(), quest.getType().name(), quest.getDescription(),
+                quest.getRequiredLevel(), quest.isRepeatable(), quest.isPartyOnly(), quest.getPrerequisiteQuestIds(),
+                quest.getCooldownHours(), objectives, toRewardInfo(quest.getReward()));
+    }
+
+    private QuestObjectiveInfo toObjectiveInfo(QuestObjective objective) {
+        return new QuestObjectiveInfo(objective.getType().name(), objective.getTargetId(), objective.getRequiredAmount());
+    }
+
+    private QuestRewardInfo toRewardInfo(QuestReward reward) {
+        return new QuestRewardInfo(reward.getExp(), reward.getMoney(), reward.getWeaponId(), reward.getAccessoryId(),
+                reward.getSkillPoints(), reward.getTitle(), reward.getVanillaMaterial(), reward.getVanillaAmount());
+    }
+
+    @Override
+    public Optional<QuestProgressDetail> getQuestProgressDetail(UUID playerId, String questId) {
+        PlayerQuestComponent component = playerDataManager.get(playerId)
+                .flatMap(d -> d.component(PlayerQuestComponent.class)).orElse(null);
+        if (component == null) {
+            return Optional.empty();
+        }
+        PlayerQuestProgress progress = component.getActiveQuests().get(questId);
+        if (progress == null) {
+            return Optional.empty();
+        }
+        return questRepository.findById(questId).map(quest -> toProgressDetail(quest, progress));
+    }
+
+    @Override
+    public List<QuestProgressDetail> listActiveQuestProgress(UUID playerId) {
+        PlayerQuestComponent component = playerDataManager.get(playerId)
+                .flatMap(d -> d.component(PlayerQuestComponent.class)).orElse(null);
+        if (component == null) {
+            return List.of();
+        }
+        return component.getActiveQuests().entrySet().stream()
+                .map(entry -> questRepository.findById(entry.getKey()).map(quest -> toProgressDetail(quest, entry.getValue())))
+                .filter(Optional::isPresent).map(Optional::get).toList();
+    }
+
+    private QuestProgressDetail toProgressDetail(QuestData quest, PlayerQuestProgress progress) {
+        List<QuestObjectiveProgressInfo> objectives = new ArrayList<>();
+        List<QuestObjective> defs = quest.getObjectives();
+        for (int i = 0; i < defs.size(); i++) {
+            QuestObjective objective = defs.get(i);
+            objectives.add(new QuestObjectiveProgressInfo(objective.getType().name(), objective.getTargetId(),
+                    Math.min(progress.getProgress(i), objective.getRequiredAmount()), objective.getRequiredAmount()));
+        }
+        return new QuestProgressDetail(quest.getId(), quest.getName(), progress.getState().name(), objectives);
     }
 
     @Override
