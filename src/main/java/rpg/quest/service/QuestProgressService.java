@@ -15,6 +15,7 @@ import rpg.quest.model.QuestObjective;
 import rpg.quest.model.QuestState;
 import rpg.quest.repository.QuestRepository;
 import rpg.util.ColorUtil;
+import rpg.world.dialogue.service.DialogueSessionService;
 
 import java.util.List;
 import java.util.Optional;
@@ -35,11 +36,13 @@ public final class QuestProgressService {
     private final QuestItemInventoryService inventoryService;
     private final MessageManager messages;
     private final QuestObjectiveFeedbackService feedbackService;
+    /** Nullable - DialogueModule registers before QuestModule so it's always available in practice, but callers still treat it as optional NPC flavor, not a hard dependency. */
+    private final DialogueSessionService dialogueSessionService;
 
     public QuestProgressService(PlayerDataManager playerDataManager, QuestRepository questRepository,
                                  QuestEligibilityService eligibilityService, QuestRewardService rewardService,
                                  QuestItemInventoryService inventoryService, MessageManager messages,
-                                 QuestObjectiveFeedbackService feedbackService) {
+                                 QuestObjectiveFeedbackService feedbackService, DialogueSessionService dialogueSessionService) {
         this.playerDataManager = playerDataManager;
         this.questRepository = questRepository;
         this.eligibilityService = eligibilityService;
@@ -47,6 +50,7 @@ public final class QuestProgressService {
         this.inventoryService = inventoryService;
         this.messages = messages;
         this.feedbackService = feedbackService;
+        this.dialogueSessionService = dialogueSessionService;
     }
 
     /**
@@ -68,7 +72,15 @@ public final class QuestProgressService {
             return ineligible;
         }
         component(player.getUniqueId()).ifPresent(c -> c.startQuest(questId));
+        playDialogue(player, quest.getStartDialogueId());
         return Optional.empty();
+    }
+
+    /** No-op if {@code dialogueSessionService} is unavailable, {@code treeId} is null/blank, or the tree id doesn't resolve. */
+    private void playDialogue(Player player, String treeId) {
+        if (dialogueSessionService != null && treeId != null && !treeId.isBlank()) {
+            dialogueSessionService.start(player, treeId);
+        }
     }
 
     /**
@@ -93,6 +105,7 @@ public final class QuestProgressService {
         }
         component.completeQuest(questId);
         rewardService.grant(player, quest.getReward());
+        playDialogue(player, quest.getCompleteDialogueId());
         notifyNewlyUnlockedQuests(player, questId);
         return true;
     }

@@ -27,6 +27,8 @@ import rpg.quest.service.QuestRewardService;
 import rpg.gui.framework.GuiManager;
 import rpg.world.core.OreliaWorldPlugin;
 import rpg.world.core.module.WorldModule;
+import rpg.world.dialogue.DialogueModule;
+import rpg.world.dialogue.service.DialogueSessionService;
 
 import java.util.logging.Level;
 
@@ -82,8 +84,13 @@ public final class QuestModule implements WorldModule {
         QuestRewardService rewardService = new QuestRewardService(
                 plugin.getPlayerDataManager(), statusApi, economy, itemApi, accessoryApi, skillApi);
         QuestObjectiveFeedbackService feedbackService = new QuestObjectiveFeedbackService(plugin.getMessageManager(), feedbackConfig);
+        // Registered before QuestModule (RegionModule -> DialogueModule -> ... -> QuestModule), so
+        // this is always present in practice - still passed through as nullable since a quest's
+        // start/complete dialogue is optional NPC flavor, not a hard requirement.
+        DialogueSessionService dialogueSessionService = plugin.getModuleManager().get(DialogueModule.class)
+                .map(DialogueModule::getSessionService).orElse(null);
         this.progressService = new QuestProgressService(plugin.getPlayerDataManager(), questRepository, eligibilityService,
-                rewardService, inventoryService, plugin.getMessageManager(), feedbackService);
+                rewardService, inventoryService, plugin.getMessageManager(), feedbackService, dialogueSessionService);
         this.questGuiScreen = new QuestGuiScreen(questRepository, progressService, eligibilityService,
                 plugin.getPlayerDataManager(), plugin.getMessageManager(), guiManager);
 
