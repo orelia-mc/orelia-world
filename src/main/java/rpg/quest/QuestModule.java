@@ -24,6 +24,7 @@ import rpg.quest.service.QuestItemInventoryService;
 import rpg.quest.service.QuestObjectiveFeedbackService;
 import rpg.quest.service.QuestProgressService;
 import rpg.quest.service.QuestRewardService;
+import rpg.gui.framework.GuiManager;
 import rpg.world.core.OreliaWorldPlugin;
 import rpg.world.core.module.WorldModule;
 import rpg.world.dialogue.DialogueModule;
@@ -42,6 +43,7 @@ public final class QuestModule implements WorldModule {
     private final QuestFeedbackConfig feedbackConfig = new QuestFeedbackConfig();
     private QuestProgressService progressService;
     private QuestGuiScreen questGuiScreen;
+    private final GuiManager guiManager = new GuiManager();
     private OreliaWorldPlugin plugin;
 
     @Override
@@ -90,15 +92,16 @@ public final class QuestModule implements WorldModule {
         this.progressService = new QuestProgressService(plugin.getPlayerDataManager(), questRepository, eligibilityService,
                 rewardService, inventoryService, plugin.getMessageManager(), feedbackService, dialogueSessionService);
         this.questGuiScreen = new QuestGuiScreen(questRepository, progressService, eligibilityService,
-                plugin.getPlayerDataManager(), plugin.getMessageManager());
+                plugin.getPlayerDataManager(), plugin.getMessageManager(), guiManager);
 
         plugin.getServer().getPluginManager().registerEvents(new QuestKillListener(combatApi, progressService), plugin);
 
-        QuestCommand questCommand = new QuestCommand(plugin.getPlayerDataManager(), questRepository, progressService, plugin.getMessageManager());
+        QuestCommand questCommand = new QuestCommand(plugin.getPlayerDataManager(), questRepository, progressService,
+                plugin.getMessageManager(), questGuiScreen, guiManager);
         plugin.getPlayerCommandRegistry().register("quest", questCommand,
-                "クエストの受注状況を確認します。", "quest <list|abandon <id>>");
+                "クエストの受注状況を確認します。", "quest <list|gui|abandon <id>>");
         CommandAliasUtil.registerAlias(plugin, "quest", questCommand,
-                "クエストの受注状況を確認します。", "<list|abandon <id>>");
+                "クエストの受注状況を確認します。", "<list|gui|abandon <id>>");
 
         TitleCommand titleCommand = new TitleCommand(plugin.getPlayerDataManager(), plugin.getMessageManager());
         String titleDescription = "獲得済みの称号を確認・装備します。";
